@@ -59,7 +59,7 @@ export default function HomePage() {
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20">
               <h3 className="text-xl font-semibold mb-3 text-blue-300">Politics & War Integration</h3>
               <p className="text-gray-300">
-                Link your Politics & War account to import your nation's stats, cities, and military units for authentic battles.
+                Link your Politics & War account to import your nation&apos;s stats, cities, and military units for authentic battles.
               </p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20">

@@ -1,0 +1,12 @@
+{
+  "name": "pnwbattler-monorepo",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd Battler && npm run build",
+    "start": "cd Battler && npm start",
+    "dev": "cd Battler && npm run dev",
+    "vercel-build": "cd Battler && npm install && npm run build"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
