@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../auth/[...nextauth]/route';
+import { authOptions } from '../../../lib/auth';
 
 // This would normally connect to a database to store verification codes
 // For now, we'll use a simple in-memory store (not suitable for production)
