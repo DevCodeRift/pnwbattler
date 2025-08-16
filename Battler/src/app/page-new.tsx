@@ -114,12 +114,9 @@ export default function HomePage() {
                     <p className="text-yellow-200 text-sm">
                       <span className="font-semibold">Action Required:</span> Verify your Politics & War account to access all features.
                     </p>
-                    <a 
-                      href="/verify"
-                      className="mt-2 inline-block text-yellow-400 hover:text-yellow-300 text-sm font-medium transition-colors"
-                    >
+                    <button className="mt-2 text-yellow-400 hover:text-yellow-300 text-sm font-medium">
                       Verify Now →
-                    </a>
+                    </button>
                   </div>
                 )}
               </div>

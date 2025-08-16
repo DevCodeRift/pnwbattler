@@ -53,33 +53,6 @@ export const GET_NATION_BY_ID = gql`
         infrastructure
         land
         powered
-        oil_power
-        wind_power
-        coal_power
-        nuclear_power
-        coal_mine
-        oil_well
-        uranium_mine
-        iron_mine
-        bauxite_mine
-        lead_mine
-        farm
-        aluminum_refinery
-        steel_mill
-        oil_refinery
-        munitions_factory
-        police_station
-        hospital
-        recycling_center
-        subway
-        supermarket
-        bank
-        shopping_mall
-        stadium
-        barracks
-        factory
-        hangar
-        drydock
       }
       score
       population
@@ -91,17 +64,6 @@ export const GET_NATION_BY_ID = gql`
       missiles
       nukes
       money
-      oil
-      food
-      steel
-      aluminum
-      gasoline
-      munitions
-      uranium
-      coal
-      iron
-      bauxite
-      lead
       wars_won
       wars_lost
       war_policy
@@ -135,33 +97,6 @@ export const GET_NATION_BY_NAME = gql`
           infrastructure
           land
           powered
-          oil_power
-          wind_power
-          coal_power
-          nuclear_power
-          coal_mine
-          oil_well
-          uranium_mine
-          iron_mine
-          bauxite_mine
-          lead_mine
-          farm
-          aluminum_refinery
-          steel_mill
-          oil_refinery
-          munitions_factory
-          police_station
-          hospital
-          recycling_center
-          subway
-          supermarket
-          bank
-          shopping_mall
-          stadium
-          barracks
-          factory
-          hangar
-          drydock
         }
         score
         population
@@ -173,17 +108,6 @@ export const GET_NATION_BY_NAME = gql`
         missiles
         nukes
         money
-        oil
-        food
-        steel
-        aluminum
-        gasoline
-        munitions
-        uranium
-        coal
-        iron
-        bauxite
-        lead
         wars_won
         wars_lost
         war_policy

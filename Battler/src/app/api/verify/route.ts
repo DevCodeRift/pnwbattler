@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../lib/auth';
+import { apolloClient, GET_NATION_BY_ID } from '../../../lib/apollo-client';
 
 // This would normally connect to a database to store verification codes
 // For now, we'll use a simple in-memory store (not suitable for production)
@@ -28,6 +29,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Nation ID is required' },
         { status: 400 }
+      );
+    }
+
+    // Verify the nation exists in P&W API
+    try {
+      const { data, errors } = await apolloClient.query({
+        query: GET_NATION_BY_ID,
+        variables: { id: nationId },
+      });
+
+      if (errors || !data.nation) {
+        return NextResponse.json(
+          { error: 'Nation not found in Politics and War' },
+          { status: 404 }
+        );
+      }
+
+      // Check if nation is already verified by another user (in production, check database)
+      const existingVerification = Array.from(verificationCodes.values())
+        .find(v => v.nationId === nationId && v.expires > new Date());
+      
+      if (existingVerification) {
+        return NextResponse.json(
+          { error: 'This nation is already being verified by another user' },
+          { status: 409 }
+        );
+      }
+
+    } catch (error) {
+      console.error('Error fetching nation from P&W API:', error);
+      return NextResponse.json(
+        { error: 'Failed to verify nation with Politics and War API' },
+        { status: 500 }
       );
     }
 
@@ -107,14 +141,39 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Verification successful
-    verificationCodes.delete(discordId);
+    // Fetch the nation data from P&W API
+    try {
+      const { data, errors } = await apolloClient.query({
+        query: GET_NATION_BY_ID,
+        variables: { id: verification.nationId },
+        fetchPolicy: 'network-only', // Always get fresh data
+      });
 
-    // In production, you would store this verification in a database
-    return NextResponse.json({
-      message: 'Account verified successfully',
-      nationId: verification.nationId,
-    });
+      if (errors || !data.nation) {
+        return NextResponse.json(
+          { error: 'Nation not found during verification' },
+          { status: 404 }
+        );
+      }
+
+      // Verification successful
+      verificationCodes.delete(discordId);
+
+      // Return the nation data along with verification success
+      return NextResponse.json({
+        message: 'Account verified successfully',
+        nation: data.nation,
+        verified: true,
+      });
+
+    } catch (error) {
+      console.error('Error fetching nation data during verification:', error);
+      return NextResponse.json(
+        { error: 'Failed to fetch nation data' },
+        { status: 500 }
+      );
+    }
+
   } catch (error) {
     console.error('Error verifying code:', error);
     return NextResponse.json(
