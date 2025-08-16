@@ -50,18 +50,6 @@ export default function Header() {
 
         {/* User Section */}
         <div className="flex items-center space-x-4">
-          {session && (
-            <div className="hidden md:flex items-center space-x-4 text-sm">
-              <div className="text-gray-300">
-                <span className="text-gray-400">Action Points:</span>
-                <span className="text-green-400 font-bold ml-1">12/12</span>
-              </div>
-              <div className="text-gray-300">
-                <span className="text-gray-400">Money:</span>
-                <span className="text-yellow-400 font-bold ml-1">$0</span>
-              </div>
-            </div>
-          )}
           <AuthButton />
         </div>
       </div>
