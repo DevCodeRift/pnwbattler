@@ -1,6 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores';
 
 export default function HomePage() {
@@ -114,12 +115,12 @@ export default function HomePage() {
                     <p className="text-yellow-200 text-sm">
                       <span className="font-semibold">Action Required:</span> Verify your Politics & War account to access all features.
                     </p>
-                    <a 
+                    <Link 
                       href="/verify"
                       className="mt-2 inline-block text-yellow-400 hover:text-yellow-300 text-sm font-medium transition-colors"
                     >
                       Verify Now →
-                    </a>
+                    </Link>
                   </div>
                 )}
               </div>

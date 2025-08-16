@@ -1,6 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 import { useUIStore, useAuthStore } from '../stores';
 
 export default function Sidebar() {
@@ -106,7 +107,7 @@ export default function Sidebar() {
                     {category.name}
                   </h3>
                   {categoryItems.map(item => (
-                    <a
+                    <Link
                       key={item.name}
                       href={item.href}
                       className="group flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-800 hover:text-white transition-colors"
@@ -116,7 +117,7 @@ export default function Sidebar() {
                       {item.name === 'Verify Account' && !isVerified && (
                         <span className="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
                       )}
-                    </a>
+                    </Link>
                   ))}
                 </div>
               );

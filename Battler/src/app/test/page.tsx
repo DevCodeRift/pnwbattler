@@ -136,7 +136,7 @@ export default function TestPage() {
             <h3 className="text-lg font-semibold text-blue-200 mb-2">Instructions</h3>
             <div className="text-blue-100 text-sm space-y-2">
               <p>• Enter any valid Politics & War nation ID to test the GraphQL API</p>
-              <p>• Try nation ID "1" for Alex's nation</p>
+              <p>• Try nation ID &quot;1&quot; for Alex&apos;s nation</p>
               <p>• This tests the /api/nations endpoint which uses the P&W GraphQL API</p>
               <p>• Make sure you have a valid API key in your .env file</p>
             </div>

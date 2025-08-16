@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 import AuthButton from './AuthButton';
 import { useUIStore } from '../stores';
 
@@ -34,18 +35,18 @@ export default function Header() {
 
         {/* Top Navigation Links */}
         <nav className="hidden md:flex items-center space-x-6">
-          <a href="#" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+          <Link href="/" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
             Home
-          </a>
-          <a href="#" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+          </Link>
+          <Link href="/battles" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
             Battles
-          </a>
-          <a href="#" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+          </Link>
+          <Link href="/leaderboard" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
             Leaderboard
-          </a>
-          <a href="#" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+          </Link>
+          <Link href="/help" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
             Help
-          </a>
+          </Link>
         </nav>
 
         {/* User Section */}
