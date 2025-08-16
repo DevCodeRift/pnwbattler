@@ -2,6 +2,10 @@
 
 A multiplayer battle simulation app for Politics and War, built with Next.js and TypeScript.
 
+## 🚀 Live Deployment
+- **Production URL**: https://pnwbattler.com
+- **Status**: ✅ Successfully deployed on Vercel
+
 ## Features
 
 - **Discord Authentication**: Login with Discord to access multiplayer features
@@ -18,6 +22,7 @@ A multiplayer battle simulation app for Politics and War, built with Next.js and
 - **API**: GraphQL with Apollo Client for Politics and War API
 - **Real-time**: Socket.IO for multiplayer functionality
 - **State Management**: Zustand
+- **Deployment**: Vercel with custom domain
 - **Database**: Vercel KV for session storage and match data
 - **Deployment**: Vercel
 
@@ -52,22 +57,34 @@ A multiplayer battle simulation app for Politics and War, built with Next.js and
    - Set up Discord OAuth application and get client ID/secret
    - Get Politics and War API key from [P&W API](https://politicsandwar.com/api/)
    - Generate NextAuth secret: `openssl rand -base64 32`
-   - Set up Vercel KV database for production
 
 ### Discord OAuth Setup
 
 1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
 2. Create a new application
 3. Go to OAuth2 settings
-4. Add redirect URI: `http://localhost:3000/api/auth/callback/discord`
-5. Copy Client ID and Client Secret to `.env.local`
+4. Add redirect URIs:
+   - Development: `http://localhost:3000/api/auth/callback/discord`
+   - Production: `https://pnwbattler.com/api/auth/callback/discord`
+5. Copy Client ID and Client Secret to your environment variables
 
 ### Politics and War API Setup
 
 1. Go to [Politics and War API](https://politicsandwar.com/api/)
 2. Generate an API key
-3. Add the API key to `.env.local`
+3. Add the API key to your environment variables
 4. For verification features, set up a bot nation account
+
+## Deployment
+
+This project is configured for deployment on Vercel:
+
+1. **Environment Variables**: Set all variables from `.env.example` in Vercel dashboard
+2. **Root Directory**: Set to `Battler` in Vercel project settings
+3. **Discord OAuth**: Add production redirect URI to Discord application
+4. **Custom Domain**: Configured for `pnwbattler.com`
+
+See `DEPLOYMENT_NOTES.md` for detailed deployment instructions and troubleshooting.
 
 ### Development
 
