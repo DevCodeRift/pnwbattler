@@ -110,12 +110,25 @@ export default function HomePage() {
     };
   }, []);
 
-  const joinLobby = (lobbyId: string, asSpectator = false) => {
+  const joinLobby = async (lobbyId: string, asSpectator = false) => {
     if (!session?.user?.name) {
       alert('Please log in to join games');
       return;
     }
-    vercelMultiplayerManager.joinLobby(lobbyId, session.user.name, asSpectator);
+    
+    console.log('🏠 Home page joining lobby:', { lobbyId, asSpectator });
+    
+    try {
+      // Use the vercel multiplayer manager to join
+      await vercelMultiplayerManager.joinLobby(lobbyId, session.user.name, asSpectator);
+      
+      // Redirect to the Real Nation Battle page where the lobby view will be shown
+      console.log('🔄 Redirecting to /battle/real after joining lobby');
+      window.location.href = '/battle/real';
+    } catch (error) {
+      console.error('Failed to join lobby from home page:', error);
+      alert('Failed to join lobby. Please try again.');
+    }
   };
 
   const joinBattle = (battleId: string) => {
