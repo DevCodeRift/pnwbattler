@@ -36,15 +36,15 @@ export default function VerifyPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to find nation');
+        throw new Error(data?.error || 'Failed to find nation');
       }
 
-      if (!data.nation) {
+      if (!data?.nation) {
         setError('Nation not found. Please check the name or ID and try again.');
         return;
       }
 
-      setFoundNation(data.nation);
+      setFoundNation(data?.nation);
       setError('');
     } catch (err: any) {
       setError(err.message || 'Failed to search for nation');
@@ -66,18 +66,18 @@ export default function VerifyPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          nationId: foundNation.id,
+          nationId: foundNation?.id,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to request verification');
+        throw new Error(data?.error || 'Failed to request verification');
       }
 
       // In development, show the code
-      if (data.code) {
+      if (data?.code) {
         setGeneratedCode(data.code);
       }
 
@@ -113,11 +113,11 @@ export default function VerifyPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to verify');
+        throw new Error(data?.error || 'Failed to verify');
       }
 
       // Update the auth store with nation data
-      setPWNation(data.nation);
+      setPWNation(data?.nation);
       setVerified(true);
       setStep('success');
       setError('');
@@ -148,14 +148,14 @@ export default function VerifyPage() {
             <div className="flex items-center space-x-4">
               <div className="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg">
-                  {pwNation.nation_name.charAt(0)}
+                  {pwNation.nation_name?.charAt(0) || 'N'}
                 </span>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">{pwNation.nation_name}</h3>
-                <p className="text-gray-300">Leader: {pwNation.leader_name}</p>
-                <p className="text-gray-300">Score: {pwNation.score.toLocaleString()}</p>
-                <p className="text-gray-300">Cities: {pwNation.cities.length}</p>
+                <h3 className="text-lg font-semibold text-white">{pwNation.nation_name || 'Unknown Nation'}</h3>
+                <p className="text-gray-300">Leader: {pwNation.leader_name || 'Unknown Leader'}</p>
+                <p className="text-gray-300">Score: {pwNation.score?.toLocaleString() || 0}</p>
+                <p className="text-gray-300">Cities: {pwNation.cities?.length || 0}</p>
               </div>
             </div>
           </div>
@@ -221,24 +221,24 @@ export default function VerifyPage() {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-gray-400">Nation:</span>
-                      <span className="text-white ml-2 font-medium">{foundNation.nation_name}</span>
+                      <span className="text-white ml-2 font-medium">{foundNation.nation_name || 'Unknown Nation'}</span>
                     </div>
                     <div>
                       <span className="text-gray-400">Leader:</span>
-                      <span className="text-white ml-2">{foundNation.leader_name}</span>
+                      <span className="text-white ml-2">{foundNation.leader_name || 'Unknown Leader'}</span>
                     </div>
                     <div>
                       <span className="text-gray-400">Score:</span>
-                      <span className="text-white ml-2">{foundNation.score.toLocaleString()}</span>
+                      <span className="text-white ml-2">{foundNation.score?.toLocaleString() || 0}</span>
                     </div>
                     <div>
                       <span className="text-gray-400">Cities:</span>
-                      <span className="text-white ml-2">{foundNation.cities.length}</span>
+                      <span className="text-white ml-2">{foundNation.cities?.length || 0}</span>
                     </div>
                     {foundNation.alliance && (
                       <div className="col-span-2">
                         <span className="text-gray-400">Alliance:</span>
-                        <span className="text-white ml-2">{foundNation.alliance.name}</span>
+                        <span className="text-white ml-2">{foundNation.alliance?.name || 'N/A'}</span>
                       </div>
                     )}
                   </div>
