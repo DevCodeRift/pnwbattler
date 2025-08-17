@@ -17,6 +17,15 @@ export async function GET(request: NextRequest) {
   try {
     console.log('GET /api/verify - Starting verification check');
     
+    // Add basic environment check
+    if (!process.env.DATABASE_URL) {
+      console.error('GET /api/verify - DATABASE_URL not configured');
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+
     const session = await getServerSession(authOptions);
     console.log('GET /api/verify - Session:', session ? 'exists' : 'null');
     
@@ -39,12 +48,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user is verified in database
+    // Check if user is verified in database with error handling
     console.log('GET /api/verify - Checking database for user:', discordId);
-    const user = await prisma.user.findUnique({
-      where: { discordId },
-    });
-    console.log('GET /api/verify - User found:', user ? 'yes' : 'no');
+    let user;
+    try {
+      user = await prisma.user.findUnique({
+        where: { discordId },
+      });
+      console.log('GET /api/verify - User found:', user ? 'yes' : 'no');
+    } catch (dbError) {
+      console.error('GET /api/verify - Database error:', dbError);
+      return NextResponse.json(
+        { error: 'Database connection failed', details: dbError instanceof Error ? dbError.message : 'Unknown database error' },
+        { status: 500 }
+      );
+    }
     
     if (user && user.isVerified && user.pwNationData) {
       console.log('GET /api/verify - User is verified');
@@ -274,14 +292,38 @@ export async function PUT(request: NextRequest) {
     }
 
     // Fetch the nation data from P&W API
+    console.log('PUT /api/verify - Fetching nation data for ID:', verification.nationId);
     try {
+      // Check if API key is available
+      const apiKey = process.env.PW_BOT_API_KEY || process.env.NEXT_PUBLIC_PW_API_KEY;
+      if (!apiKey) {
+        console.error('PUT /api/verify - No API key available for GraphQL query');
+        return NextResponse.json(
+          { error: 'Server configuration error - API key missing' },
+          { status: 500 }
+        );
+      }
+
       const { data, errors } = await apolloClient.query({
         query: GET_NATION_BY_ID,
         variables: { id: parseInt(verification.nationId) },
         fetchPolicy: 'network-only', // Always get fresh data
       });
 
-      if (errors || !data.nations?.data?.[0]) {
+      console.log('PUT /api/verify - GraphQL response errors:', errors);
+      console.log('PUT /api/verify - GraphQL response data available:', !!data);
+      console.log('PUT /api/verify - Nation data found:', !!data?.nations?.data?.[0]);
+
+      if (errors) {
+        console.error('PUT /api/verify - GraphQL errors:', errors);
+        return NextResponse.json(
+          { error: 'Failed to fetch nation data from Politics & War API', details: errors.map(e => e.message).join(', ') },
+          { status: 500 }
+        );
+      }
+
+      if (!data.nations?.data?.[0]) {
+        console.error('PUT /api/verify - No nation data returned');
         return NextResponse.json(
           { error: 'Nation not found during verification' },
           { status: 404 }
@@ -289,33 +331,44 @@ export async function PUT(request: NextRequest) {
       }
 
       const nation = data.nations.data[0];
+      console.log('PUT /api/verify - Successfully fetched nation:', nation.nation_name);
 
       // Verification successful
       verificationCodes.delete(discordId);
 
-      // Save or update user in database
-      await prisma.user.upsert({
-        where: { discordId },
-        update: {
-          isVerified: true,
-          pwNationId: verification.nationId,
-          pwNationName: nation.nation_name,
-          pwNationData: nation,
-          verifiedAt: new Date(),
-          discordUsername: (session.user as any).username || session.user.name,
-          discordAvatar: (session.user as any).avatar,
-        },
-        create: {
-          discordId,
-          discordUsername: (session.user as any).username || session.user.name || 'Unknown',
-          discordAvatar: (session.user as any).avatar,
-          isVerified: true,
-          pwNationId: verification.nationId,
-          pwNationName: nation.nation_name,
-          pwNationData: nation,
-          verifiedAt: new Date(),
-        },
-      });
+      // Save or update user in database with error handling
+      console.log('PUT /api/verify - Saving user to database');
+      try {
+        await prisma.user.upsert({
+          where: { discordId },
+          update: {
+            isVerified: true,
+            pwNationId: verification.nationId,
+            pwNationName: nation.nation_name,
+            pwNationData: nation,
+            verifiedAt: new Date(),
+            discordUsername: (session.user as any).username || session.user.name,
+            discordAvatar: (session.user as any).avatar,
+          },
+          create: {
+            discordId,
+            discordUsername: (session.user as any).username || session.user.name || 'Unknown',
+            discordAvatar: (session.user as any).avatar,
+            isVerified: true,
+            pwNationId: verification.nationId,
+            pwNationName: nation.nation_name,
+            pwNationData: nation,
+            verifiedAt: new Date(),
+          },
+        });
+        console.log('PUT /api/verify - User saved successfully');
+      } catch (dbError) {
+        console.error('PUT /api/verify - Database save error:', dbError);
+        return NextResponse.json(
+          { error: 'Failed to save verification to database', details: dbError instanceof Error ? dbError.message : 'Unknown database error' },
+          { status: 500 }
+        );
+      }
 
       // Return the nation data along with verification success
       return NextResponse.json({
