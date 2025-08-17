@@ -36,10 +36,10 @@ export async function POST(request: NextRequest) {
     try {
       const { data, errors } = await apolloClient.query({
         query: GET_NATION_BY_ID,
-        variables: { id: nationId },
+        variables: { id: parseInt(nationId) },
       });
 
-      if (errors || !data.nation) {
+      if (errors || !data.nations?.data?.[0]) {
         return NextResponse.json(
           { error: 'Nation not found in Politics and War' },
           { status: 404 }
@@ -145,16 +145,18 @@ export async function PUT(request: NextRequest) {
     try {
       const { data, errors } = await apolloClient.query({
         query: GET_NATION_BY_ID,
-        variables: { id: verification.nationId },
+        variables: { id: parseInt(verification.nationId) },
         fetchPolicy: 'network-only', // Always get fresh data
       });
 
-      if (errors || !data.nation) {
+      if (errors || !data.nations?.data?.[0]) {
         return NextResponse.json(
           { error: 'Nation not found during verification' },
           { status: 404 }
         );
       }
+
+      const nation = data.nations.data[0];
 
       // Verification successful
       verificationCodes.delete(discordId);
@@ -162,7 +164,7 @@ export async function PUT(request: NextRequest) {
       // Return the nation data along with verification success
       return NextResponse.json({
         message: 'Account verified successfully',
-        nation: data.nation,
+        nation: nation,
         verified: true,
       });
 
