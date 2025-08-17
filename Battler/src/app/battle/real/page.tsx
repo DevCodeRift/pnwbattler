@@ -486,43 +486,28 @@ function RealBattleContent() {
     setError('');
 
     try {
+      console.log('Starting battle for lobby:', currentLobby.id);
       const response = await fetch('/api/multiplayer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'start-battle',
           lobbyId: currentLobby.id,
-          gameState: {
-            turn: 1,
-            playerTurn: currentLobby.hostName,
-            player1: {
-              name: currentLobby.hostName,
-              units: settings.maxUnits,
-              cities: settings.cityMode === 'NATION_CITIES' ? 10 : 20,
-              resources: settings.economyType === 'UNLIMITED' ? 
-                { money: 1000000, steel: 50000, aluminum: 30000 } :
-                { money: 100000, steel: 5000, aluminum: 3000 }
-            },
-            player2: {
-              name: 'Player2', // This would be the actual second player's name
-              units: settings.maxUnits,
-              cities: settings.cityMode === 'NATION_CITIES' ? 10 : 20,
-              resources: settings.economyType === 'UNLIMITED' ? 
-                { money: 1000000, steel: 50000, aluminum: 30000 } :
-                { money: 100000, steel: 5000, aluminum: 3000 }
-            }
-          }
         })
       });
 
       const data = await response.json();
+      console.log('Start battle response:', data);
       
       if (response.ok && data.battle) {
+        console.log('Battle started successfully:', data.battle);
         setBattle(data.battle);
         setGameState('battle');
+        console.log('Game state set to battle, currentBattle state:', data.battle);
         await loadActiveGames();
       } else {
         setError(data.error || 'Failed to start battle');
+        console.error('Start battle failed:', data.error);
       }
     } catch (error) {
       setError('Network error while starting battle');
@@ -939,7 +924,34 @@ function RealBattleContent() {
             <div className="bg-gray-800 rounded-lg p-6">
               <p className="text-green-400 text-xl mb-4">Battle Started Successfully!</p>
               <p className="text-gray-300 mb-4">Battle ID: {currentBattle.id}</p>
+              <p className="text-gray-300 mb-4">Players: {currentBattle.playerCount}</p>
+              <p className="text-gray-300 mb-4">Status: {currentBattle.status}</p>
               <p className="text-gray-300 mb-6">The battle interface would be loaded here with real-time updates.</p>
+              
+              <div className="bg-gray-700 rounded p-4 mb-4">
+                <h3 className="text-lg font-semibold mb-2">Debug Info:</h3>
+                <pre className="text-sm text-gray-300 overflow-auto">
+                  {JSON.stringify(currentBattle, null, 2)}
+                </pre>
+              </div>
+              
+              <button
+                onClick={() => setGameState('setup')}
+                className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-semibold"
+              >
+                Back to Lobby List
+              </button>
+            </div>
+          </div>
+        )}
+
+        {gameState === 'battle' && !currentBattle && (
+          <div>
+            <h1 className="text-3xl font-bold mb-8">Battle Error</h1>
+            <div className="bg-red-800 rounded-lg p-6">
+              <p className="text-red-400 text-xl mb-4">Battle state is set but no battle data found!</p>
+              <p className="text-gray-300 mb-6">Game State: {gameState}</p>
+              <p className="text-gray-300 mb-6">Current Battle: {currentBattle ? 'Set' : 'Not Set'}</p>
               
               <button
                 onClick={() => setGameState('setup')}

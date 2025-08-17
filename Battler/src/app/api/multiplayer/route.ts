@@ -414,6 +414,8 @@ export async function POST(request: NextRequest) {
       case 'start-battle': {
         const { lobbyId } = data;
         
+        console.log('Start battle request:', { lobbyId, discordId, userName });
+        
         const lobby = await prisma.lobby.findUnique({
           where: { id: lobbyId },
           include: {
@@ -423,10 +425,19 @@ export async function POST(request: NextRequest) {
         });
 
         if (!lobby) {
+          console.log('Lobby not found:', lobbyId);
           return NextResponse.json({ error: 'Lobby not found' }, { status: 404 });
         }
 
+        // Check if the requesting user is the host
+        const hostPlayer = lobby.players.find((player: any) => player.isHost);
+        if (!hostPlayer || hostPlayer.discordId !== discordId) {
+          console.log('Not authorized to start battle. Host:', hostPlayer?.discordId, 'Requester:', discordId);
+          return NextResponse.json({ error: 'Only the host can start the battle' }, { status: 403 });
+        }
+
         if (lobby.players.length < 2) {
+          console.log('Not enough players:', lobby.players.length);
           return NextResponse.json({ error: 'Need 2 players to start battle' }, { status: 400 });
         }
 
@@ -434,10 +445,13 @@ export async function POST(request: NextRequest) {
         const allPlayersReady = lobby.players.every((player: any) => player.isReady);
         if (!allPlayersReady) {
           const notReadyPlayers = lobby.players.filter((player: any) => !player.isReady).map((player: any) => player.name);
+          console.log('Not all players ready:', notReadyPlayers);
           return NextResponse.json({ 
             error: `Not all players are ready. Waiting for: ${notReadyPlayers.join(', ')}` 
           }, { status: 400 });
         }
+
+        console.log('All validation passed, creating battle...');
 
         // Update lobby activity before starting battle
         await updateLobbyActivity(lobbyId);
@@ -447,6 +461,8 @@ export async function POST(request: NextRequest) {
           where: { id: lobbyId },
           data: { status: 'IN_PROGRESS' },
         });
+
+        console.log('Lobby status updated to IN_PROGRESS');
 
         // Create battle
         const battle = await prisma.battle.create({
@@ -465,6 +481,8 @@ export async function POST(request: NextRequest) {
             startedAt: new Date(),
           },
         });
+
+        console.log('Battle created:', battle.id);
 
         // Move spectators to battle (players stay with lobby)
         if (lobby.spectators.length > 0) {
@@ -498,12 +516,16 @@ export async function POST(request: NextRequest) {
           startedAt: battleWithDetails!.startedAt?.toISOString(),
         };
 
+        console.log('Formatted battle:', formattedBattle);
+
         // Broadcast battle start
         await pusher.trigger('multiplayer', 'battle-created', formattedBattle);
         await pusher.trigger(`lobby-${lobbyId}`, 'battle-started', {
           battleId: battle.id,
           battle: formattedBattle,
         });
+
+        console.log('Battle events broadcasted, returning response');
 
         return NextResponse.json({ battle: formattedBattle });
       }
