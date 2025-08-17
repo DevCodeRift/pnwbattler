@@ -188,41 +188,39 @@ export default function LoginPage() {
       <div className="min-h-screen bg-black relative overflow-hidden">
         <MatrixRain />
         
-        <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
-          <div className="max-w-md w-full">
+        <div className="relative z-10 min-h-screen flex items-center justify-center p-4 py-8">
+          <div className="max-w-sm w-full my-auto">
             {/* Logo/Title */}
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold text-green-400 neon-text mb-2">
+            <div className="text-center mb-4">
+              <h1 className="text-2xl font-bold text-green-400 neon-text mb-1">
                 P&W BATTLER
               </h1>
-              <div className="text-green-300 text-sm font-mono">
+              <div className="text-green-300 text-xs font-mono">
                 [ BATTLE SIMULATION SYSTEM ]
               </div>
             </div>
 
             {/* Main login card */}
-            <div className="neon-border bg-black bg-opacity-90 rounded-lg p-8 backdrop-blur-sm">
-              <div className="text-center space-y-6">
+            <div className="neon-border bg-black bg-opacity-90 rounded-lg p-4 backdrop-blur-sm">
+              <div className="text-center space-y-3">
                 {/* Animated status text */}
-                <div className="h-8 flex items-center justify-center">
-                  <span className="text-green-400 font-mono text-sm typing-cursor">
+                <div className="h-5 flex items-center justify-center">
+                  <span className="text-green-400 font-mono text-xs typing-cursor">
                     {animatedText}
                   </span>
                 </div>
 
-                {/* System info */}
-                <div className="text-green-300 font-mono text-xs space-y-1 border border-green-400 border-opacity-30 rounded p-3">
-                  <div>[ SYSTEM STATUS: ONLINE ]</div>
-                  <div>[ ENCRYPTION: AES-256 ]</div>
+                {/* System info - Made more compact */}
+                <div className="text-green-300 font-mono text-xs space-y-1 border border-green-400 border-opacity-30 rounded p-2">
+                  <div>[ STATUS: ONLINE | ENCRYPTION: AES-256 ]</div>
                   <div>[ PROTOCOL: DISCORD OAUTH2 ]</div>
-                  <div>[ DATABASE: POLITICS & WAR API v3 ]</div>
                 </div>
 
                 {/* Login button */}
                 <button
                   onClick={handleDiscordLogin}
                   disabled={loading}
-                  className="w-full py-4 px-6 neon-button font-mono font-bold text-lg rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-3 px-6 neon-button font-mono font-bold text-base rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <div className="flex items-center justify-center space-x-2">
@@ -234,23 +232,23 @@ export default function LoginPage() {
                   )}
                 </button>
 
-                {/* Security notice */}
-                <div className="text-green-300 font-mono text-xs space-y-2 border-t border-green-400 border-opacity-30 pt-4">
-                  <div className="text-yellow-400">⚠ SECURITY PROTOCOL</div>
-                  <div>Your Discord account will be linked to your Politics & War nation for secure battle simulation access.</div>
+                {/* Security notice - Made more compact */}
+                <div className="text-green-300 font-mono text-xs border-t border-green-400 border-opacity-30 pt-2">
+                  <div className="text-yellow-400 mb-1">⚠ SECURITY</div>
+                  <div>Discord linked for secure access.</div>
                 </div>
 
                 {/* Version info */}
                 <div className="text-green-500 text-xs font-mono opacity-70">
-                  BATTLER v3.14.1 | BUILD: MATRIX-ALPHA
+                  BATTLER v3.14.1
                 </div>
               </div>
             </div>
 
-            {/* Additional matrix effects */}
-            <div className="mt-8 text-center">
+            {/* Simplified matrix effects */}
+            <div className="mt-3 text-center">
               <div className="inline-block text-green-400 font-mono text-xs opacity-60">
-                ▓▓▓▓▓▓▓▓▓▓ SECURE CONNECTION ESTABLISHED ▓▓▓▓▓▓▓▓▓▓
+                ▓▓▓ SECURE ▓▓▓
               </div>
             </div>
           </div>
