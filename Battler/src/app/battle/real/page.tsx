@@ -57,6 +57,13 @@ function RealBattleContent() {
     }
   });
 
+  // Debug effect to track state changes
+  useEffect(() => {
+    console.log('=== STATE CHANGE DETECTED ===');
+    console.log('gameState changed to:', gameState);
+    console.log('currentLobby changed to:', currentLobby ? `ID: ${currentLobby.id}, Players: ${currentLobby.playerCount}` : 'null');
+  }, [gameState, currentLobby]);
+
   // Initialize Pusher and load initial data
   useEffect(() => {
     // Initialize Pusher
@@ -368,9 +375,22 @@ function RealBattleContent() {
       console.log('Join lobby response:', data);
       
       if (response.ok && data.lobby) {
-        console.log('Setting current lobby to:', data.lobby);
+        console.log('=== JOIN LOBBY SUCCESS ===');
+        console.log('API Response data:', data);
+        console.log('About to set currentLobby to:', data.lobby);
+        console.log('About to set gameState to: lobby');
+        console.log('Current gameState before update:', gameState);
+        console.log('Current currentLobby before update:', currentLobby);
+        
         setCurrentLobby(data.lobby);
         setGameState('lobby');
+        
+        // Check state after setting (with a small delay to account for React's async updates)
+        setTimeout(() => {
+          console.log('=== STATE CHECK AFTER UPDATE ===');
+          console.log('gameState after update should be lobby, is:', gameState);
+          console.log('currentLobby after update:', currentLobby);
+        }, 100);
         
         // Subscribe to lobby-specific events
         subscribeToLobbyEvents(data.lobby.id);
@@ -387,9 +407,14 @@ function RealBattleContent() {
         setError(data.error || 'Failed to join lobby');
       }
     } catch (error) {
+      console.error('=== JOIN LOBBY ERROR ===');
+      console.error('Error during join lobby:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       setError('Network error while joining lobby');
       console.error('Join lobby error:', error);
     } finally {
+      console.log('=== JOIN LOBBY FINALLY ===');
+      console.log('Setting loading to false');
       setLoading(false);
     }
   };
