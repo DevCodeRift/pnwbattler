@@ -31,11 +31,30 @@ export default function RealNationBattlePage() {
 
   const fetchNationData = async (nationId: string) => {
     try {
+      console.log(`Fetching nation data for ID: ${nationId}`);
+      
       const response = await fetch(`/api/nations?id=${nationId}`);
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch nation data');
+        const errorText = await response.text();
+        console.error('API response not ok:', response.status, errorText);
+        throw new Error(`Failed to fetch nation data: ${response.status} ${errorText}`);
       }
-      return await response.json();
+      
+      const result = await response.json();
+      console.log('API Response for nation', nationId, ':', result);
+      
+      if (result.error) {
+        console.error('API returned error:', result.error);
+        throw new Error(result.error);
+      }
+
+      if (!result.nation) {
+        console.error('No nation data in response:', result);
+        throw new Error('No nation data found in response');
+      }
+
+      return result.nation; // Extract the nation from the response
     } catch (error) {
       console.error('Error fetching nation data:', error);
       throw error;
@@ -43,10 +62,20 @@ export default function RealNationBattlePage() {
   };
 
   const convertToSimulatedNation = (nationData: any, nationalId: string): SimulatedNation => {
+    console.log('Converting nation data:', nationData);
+    
+    // Handle case where nationData might be null or undefined
+    if (!nationData) {
+      console.error('No nation data received for ID:', nationalId);
+      return createDefaultNation(nationalId);
+    }
+
     // Convert P&W nation data to our SimulatedNation format
     const cities = nationData.cities || [];
+    console.log('Nation cities:', cities);
+    
     const simulatedCities = cities.map((city: any) => ({
-      id: city.id || Math.random().toString(),
+      id: city.id?.toString() || Math.random().toString(),
       name: city.name || 'Unknown City',
       infrastructure: city.infrastructure || 1000,
       land: city.land || 500,
@@ -88,21 +117,16 @@ export default function RealNationBattlePage() {
 
     // If no cities, create a default city
     if (simulatedCities.length === 0) {
-      simulatedCities.push({
-        id: '1',
-        name: 'Capital',
-        infrastructure: 1000,
-        land: 500,
-        powered: true,
-        barracks: 0, factory: 0, hangar: 0, drydock: 0,
-        coal_power: 0, oil_power: 0, nuclear_power: 0, wind_power: 0,
-        coal_mine: 0, oil_well: 0, uranium_mine: 0, iron_mine: 0,
-        bauxite_mine: 0, lead_mine: 0, farm: 0,
-        aluminum_refinery: 0, steel_mill: 0, oil_refinery: 0, munitions_factory: 0,
-        police_station: 0, hospital: 0, recycling_center: 0, subway: 0,
-        supermarket: 0, bank: 0, shopping_mall: 0, stadium: 0
-      });
+      console.log('No cities found, creating default city');
+      simulatedCities.push(createDefaultCity());
     }
+
+    console.log('Military data:', {
+      soldiers: nationData.soldiers,
+      tanks: nationData.tanks,
+      aircraft: nationData.aircraft,
+      ships: nationData.ships
+    });
 
     return {
       id: nationData.id?.toString() || nationalId,
@@ -147,6 +171,38 @@ export default function RealNationBattlePage() {
       maxMaps: 12
     };
   };
+
+  const createDefaultNation = (nationalId: string): SimulatedNation => ({
+    id: nationalId,
+    nation_name: `Nation ${nationalId}`,
+    leader_name: 'Unknown Leader',
+    cities: [createDefaultCity()],
+    military: {
+      barracks: 0, factories: 0, hangars: 0, drydocks: 0,
+      soldiers: 0, tanks: 0, aircraft: 0, ships: 0,
+      missiles: 0, nukes: 0
+    },
+    resources: {
+      money: 1000000, oil: 1000, food: 1000, steel: 1000,
+      aluminum: 1000, gasoline: 1000, munitions: 1000,
+      uranium: 100, coal: 1000, iron: 1000, bauxite: 1000, lead: 1000
+    },
+    war_policy: 'Attrition', domestic_policy: 'Manifest Destiny',
+    government_type: 'Democracy', economic_policy: 'Capitalism',
+    social_policy: 'Liberal', score: 1000, population: 1000000,
+    land: 10000, maps: 6, maxMaps: 12
+  });
+
+  const createDefaultCity = () => ({
+    id: '1', name: 'Capital', infrastructure: 1000, land: 500, powered: true,
+    barracks: 0, factory: 0, hangar: 0, drydock: 0,
+    coal_power: 0, oil_power: 0, nuclear_power: 0, wind_power: 0,
+    coal_mine: 0, oil_well: 0, uranium_mine: 0, iron_mine: 0,
+    bauxite_mine: 0, lead_mine: 0, farm: 0,
+    aluminum_refinery: 0, steel_mill: 0, oil_refinery: 0, munitions_factory: 0,
+    police_station: 0, hospital: 0, recycling_center: 0, subway: 0,
+    supermarket: 0, bank: 0, shopping_mall: 0, stadium: 0
+  });
 
   const createBattleSession = async () => {
     if (!attackingNationId || !defendingNationId) {

@@ -57,11 +57,54 @@ export const GET_NATION_BY_ID = gql`
         missiles
         nukes
         money
+        coal
+        oil
+        uranium
+        iron
+        bauxite
+        lead
+        gasoline
+        munitions
+        steel
+        aluminum
+        food
+        population
+        land
         wars_won
         wars_lost
         cities {
           id
           name
+          infrastructure
+          land
+          powered
+          barracks
+          factory
+          hangar
+          drydock
+          coal_power
+          oil_power
+          nuclear_power
+          wind_power
+          coal_mine
+          oil_well
+          uranium_mine
+          iron_mine
+          bauxite_mine
+          lead_mine
+          farm
+          aluminum_refinery
+          steel_mill
+          oil_refinery
+          munitions_factory
+          police_station
+          hospital
+          recycling_center
+          subway
+          supermarket
+          bank
+          shopping_mall
+          stadium
         }
       }
     }
@@ -90,11 +133,54 @@ export const GET_NATION_BY_NAME = gql`
         missiles
         nukes
         money
+        coal
+        oil
+        uranium
+        iron
+        bauxite
+        lead
+        gasoline
+        munitions
+        steel
+        aluminum
+        food
+        population
+        land
         wars_won
         wars_lost
         cities {
           id
           name
+          infrastructure
+          land
+          powered
+          barracks
+          factory
+          hangar
+          drydock
+          coal_power
+          oil_power
+          nuclear_power
+          wind_power
+          coal_mine
+          oil_well
+          uranium_mine
+          iron_mine
+          bauxite_mine
+          lead_mine
+          farm
+          aluminum_refinery
+          steel_mill
+          oil_refinery
+          munitions_factory
+          police_station
+          hospital
+          recycling_center
+          subway
+          supermarket
+          bank
+          shopping_mall
+          stadium
         }
       }
     }
