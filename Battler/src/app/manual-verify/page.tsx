@@ -83,16 +83,16 @@ export default function ManualVerifyPage() {
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Manual Verification (Development)</h1>
+        <h1 className="text-3xl font-bold mb-6">Manual Verification (Admin)</h1>
         
         <div className="bg-gray-800 rounded-lg p-6 mb-6">
-          <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4 mb-6">
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2">
-              <span className="text-yellow-400">⚠️</span>
-              <span className="text-yellow-200 font-medium">Development Mode Only</span>
+              <span className="text-blue-400">🔒</span>
+              <span className="text-blue-200 font-medium">Admin Access Only</span>
             </div>
-            <p className="text-yellow-100 text-sm mt-2">
-              This manual verification endpoint is only available in development mode for testing purposes.
+            <p className="text-blue-100 text-sm mt-2">
+              This manual verification endpoint is restricted to authorized administrators for testing and development purposes.
             </p>
           </div>
 

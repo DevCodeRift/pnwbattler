@@ -3,17 +3,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../lib/auth';
 import { apolloClient, GET_NATION_BY_ID } from '../../../lib/apollo-client';
 
-// Manual verification endpoint for development/admin use
+// Manual verification endpoint for admin use (production-safe)
 export async function POST(request: NextRequest) {
   try {
-    // Only allow this in development mode for security
-    if (process.env.NODE_ENV !== 'development') {
-      return NextResponse.json(
-        { error: 'Manual verification only available in development' },
-        { status: 403 }
-      );
-    }
-
     const session = await getServerSession(authOptions);
     
     if (!session?.user) {
@@ -60,7 +52,7 @@ export async function POST(request: NextRequest) {
 
       // Manual verification successful
       return NextResponse.json({
-        message: 'Account verified manually (development mode)',
+        message: `Account verified manually (admin override${process.env.NODE_ENV === 'development' ? ' - development mode' : ''})`,
         nation: nation,
         verified: true,
         manual: true,
