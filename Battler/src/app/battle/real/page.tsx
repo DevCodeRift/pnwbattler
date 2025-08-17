@@ -318,8 +318,25 @@ export default function RealNationBattlePage() {
       const sessionData = await sessionResponse.json();
       
       if (sessionData.session) {
-        setBattleSession(sessionData.session);
-        setTimeRemaining(30);
+        // Start the session to make it active for battle actions
+        const startResponse = await fetch('/api/battle-simulation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'start_session',
+            sessionId: sessionId
+          }),
+        });
+
+        if (startResponse.ok) {
+          setBattleSession(sessionData.session);
+          setTimeRemaining(30);
+        } else {
+          const startError = await startResponse.json();
+          throw new Error(startError.error || 'Failed to start session');
+        }
       } else {
         throw new Error('Invalid session response format');
       }
@@ -335,25 +352,41 @@ export default function RealNationBattlePage() {
   const handleExecuteAction = async (action: any) => {
     if (!battleSession) return;
 
+    console.log('Executing action:', action);
+    console.log('Session ID:', battleSession.id);
+    console.log('Nation ID:', attackingNationId);
+
     try {
+      const requestBody = {
+        action: 'execute_action',
+        sessionId: battleSession.id,
+        nationId: attackingNationId,
+        battleAction: action
+      };
+      
+      console.log('Request body:', requestBody);
+
       const response = await fetch('/api/battle-simulation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          action: 'execute_action',
-          sessionId: battleSession.id,
-          nationId: attackingNationId,
-          battleAction: action
-        })
+        body: JSON.stringify(requestBody)
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.session) {
-          setBattleSession(result.session);
-        }
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        return;
+      }
+
+      const result = await response.json();
+      console.log('API Result:', result);
+      
+      if (result.session) {
+        setBattleSession(result.session);
       }
     } catch (error) {
       console.error('Error executing action:', error);
