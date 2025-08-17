@@ -79,13 +79,60 @@ export async function POST(request: NextRequest) {
       expires,
     });
 
-    // In a real implementation, you would send an in-game message to the nation
-    // For now, we'll just return the code for demo purposes
-    console.log(`Verification code for nation ${nationId}: ${code}`);
+    // Send verification message to the nation via P&W REST API
+    try {
+      const messageSubject = 'PnW Battler - Account Verification';
+      const messageBody = `Hello! 
+
+Your verification code for PnW Battler is: ${code}
+
+Please enter this code on the verification page to link your Politics & War account with your Discord account.
+
+This code will expire in 30 minutes.
+
+If you did not request this verification, please ignore this message.
+
+- PnW Battler Team`;
+
+      const apiKey = process.env.PW_BOT_API_KEY || process.env.NEXT_PUBLIC_PW_API_KEY;
+      
+      if (!apiKey) {
+        console.error('No API key found for sending messages');
+      } else {
+        // Use P&W REST API to send message
+        const messageResponse = await fetch('https://politicsandwar.com/api/send-message/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            key: apiKey,
+            to: nationId,
+            subject: messageSubject,
+            message: messageBody,
+          }),
+        });
+
+        if (messageResponse.ok) {
+          const messageResult = await messageResponse.json();
+          if (messageResult.success) {
+            console.log(`Verification message sent successfully to nation ${nationId}`);
+          } else {
+            console.error('Failed to send verification message:', messageResult);
+          }
+        } else {
+          const errorData = await messageResponse.text();
+          console.error('Failed to send verification message - HTTP error:', errorData);
+        }
+      }
+    } catch (messageError) {
+      console.error('Error sending verification message:', messageError);
+      // Don't fail the verification request if message sending fails
+    }
 
     return NextResponse.json({
-      message: 'Verification code generated. Check your Politics and War inbox.',
-      // In production, don't return the code
+      message: 'Verification code sent to your Politics and War inbox.',
+      // In development, also return the code for testing
       code: process.env.NODE_ENV === 'development' ? code : undefined,
     });
   } catch (error) {
