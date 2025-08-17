@@ -59,6 +59,10 @@ export const GET_NATION_BY_ID = gql`
         money
         wars_won
         wars_lost
+        cities {
+          id
+          name
+        }
       }
     }
   }
@@ -88,6 +92,10 @@ export const GET_NATION_BY_NAME = gql`
         money
         wars_won
         wars_lost
+        cities {
+          id
+          name
+        }
       }
     }
   }
