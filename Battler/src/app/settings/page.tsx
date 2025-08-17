@@ -6,24 +6,30 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../stores';
 
 export default function SettingsPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const { isVerified, pwNation } = useAuthStore();
   const router = useRouter();
 
   // Authentication check and redirect
   useEffect(() => {
-    if (!session) {
+    // Wait for session to load
+    if (status === 'loading') return;
+    
+    // Redirect to login if not authenticated
+    if (status === 'unauthenticated' || !session) {
       router.push('/login');
       return;
     }
-    if (!isVerified || !pwNation) {
+    
+    // Redirect to verify if not verified
+    if (session && (!isVerified || !pwNation)) {
       router.push('/verify');
       return;
     }
-  }, [session, isVerified, pwNation, router]);
+  }, [session, status, isVerified, pwNation, router]);
 
   // Don't render content while redirecting for authentication
-  if (!session || !isVerified || !pwNation) {
+  if (status === 'loading' || !session || !isVerified || !pwNation) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
         <div className="text-center">

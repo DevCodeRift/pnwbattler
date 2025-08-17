@@ -6,23 +6,38 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../../stores';
 
 export default function CreateBattlePage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const { pwNation, isVerified } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
-    if (!session || !isVerified) {
+    // Wait for session to load
+    if (status === 'loading') return;
+    
+    // Redirect to login if not authenticated
+    if (status === 'unauthenticated' || !session) {
       router.push('/login');
       return;
     }
 
-    if (!pwNation?.id) {
+    // Redirect to verify if not verified
+    if (session && (!isVerified || !pwNation?.id)) {
       router.push('/verify');
       return;
     }
-  }, [session, isVerified, pwNation, router]);
+  }, [session, status, isVerified, pwNation, router]);
 
-  if (!session || !isVerified || !pwNation?.id) {
+  // Show loading while checking authentication
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  // Show loading while redirecting
+  if (status === 'unauthenticated' || !session || !isVerified || !pwNation?.id) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-white">Checking authentication...</div>

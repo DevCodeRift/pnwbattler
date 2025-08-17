@@ -30,7 +30,7 @@ interface OnlineUser {
 }
 
 function RealBattleContent() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const { isVerified, pwNation } = useAuthStore();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -47,15 +47,21 @@ function RealBattleContent() {
 
   // Redirect unauthenticated users
   useEffect(() => {
-    if (!session) {
+    // Wait for session to load
+    if (status === 'loading') return;
+    
+    // Redirect to login if not authenticated
+    if (status === 'unauthenticated' || !session) {
       router.push('/login');
       return;
     }
-    if (!isVerified || !pwNation) {
+    
+    // Redirect to verify if not verified
+    if (session && (!isVerified || !pwNation)) {
       router.push('/verify');
       return;
     }
-  }, [session, isVerified, pwNation, router]);
+  }, [session, status, isVerified, pwNation, router]);
 
   // Form state for creating lobby
   const [hostName, setHostName] = useState(session?.user?.name || '');
@@ -572,12 +578,14 @@ function RealBattleContent() {
   };
 
   // Don't render anything while redirecting for authentication
-  if (!session || !isVerified || !pwNation) {
+  if (status === 'loading' || !session || !isVerified || !pwNation) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-300">Checking authentication...</p>
+          <p className="text-gray-300">
+            {status === 'loading' ? 'Loading...' : 'Checking authentication...'}
+          </p>
         </div>
       </div>
     );
