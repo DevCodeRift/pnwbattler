@@ -249,12 +249,14 @@ export default function RealNationBattlePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'createSession',
-          settings: {
-            economySettings: 'BALANCED',
-            militarizationLevel: 'STANDARD',
-            simulationMode: 'REALISTIC'
-          },
+          action: 'create_session',
+          battleMode: 'open_lobby',
+          turnCooldown: 60,
+          turnsUntilRecruitment: 1,
+          militarizationLevel: 'partial',
+          economyMode: 'limited',
+          spyOperationsEnabled: false,
+          isPrivate: false,
           hostNation: attacker
         }),
       });
@@ -279,7 +281,7 @@ export default function RealNationBattlePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'joinSession',
+          action: 'join_session',
           sessionId: sessionId,
           nation: defender
         }),
@@ -303,7 +305,7 @@ export default function RealNationBattlePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'getSession',
+          action: 'get_session',
           sessionId: sessionId
         }),
       });
