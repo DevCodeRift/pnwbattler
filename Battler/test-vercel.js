@@ -57,7 +57,7 @@ async function testAPI() {
     console.log('\n3. Testing JOIN_LOBBY...');
     try {
       const joinLobbyData = {
-        action: 'join_lobby',
+        action: 'join-lobby',
         lobbyId: global.testLobbyId,
         playerName: 'TestPlayer'
       };
@@ -81,7 +81,7 @@ async function testAPI() {
   // Test 4: Get updated lobbies and battles
   console.log('\n4. Testing GET /api/multiplayer after changes...');
   try {
-    const response = await fetch(`${BASE_URL}/api/multiplayer`);
+    const response = await fetch(`${BASE_URL}/api/multiplayer?action=active-games`);
     const data = await response.json();
     console.log('✅ Updated GET Response:', JSON.stringify(data, null, 2));
   } catch (error) {
