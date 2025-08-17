@@ -161,9 +161,11 @@ function RealBattleContent() {
   }, [searchParams, session]);
 
   const loadActiveGames = async () => {
+    console.log('🔄 Loading active games...');
     try {
       const response = await fetch('/api/multiplayer?action=active-games');
       const data = await response.json();
+      console.log('📊 Active games loaded:', { lobbies: data.lobbies?.length, battles: data.battles?.length });
       setLobbies(data.lobbies || []);
       setBattles(data.battles || []);
     } catch (error) {
@@ -393,13 +395,6 @@ function RealBattleContent() {
         setCurrentLobby(data.lobby);
         setGameState('lobby');
         
-        // Check state after setting (with a small delay to account for React's async updates)
-        setTimeout(() => {
-          console.log('=== STATE CHECK AFTER UPDATE ===');
-          console.log('gameState after update should be lobby, is:', gameState);
-          console.log('currentLobby after update:', currentLobby);
-        }, 100);
-        
         // Subscribe to lobby-specific events
         subscribeToLobbyEvents(data.lobby.id);
         
@@ -409,7 +404,17 @@ function RealBattleContent() {
           console.log('Successfully joined new lobby');
         }
         
-        await loadActiveGames();
+        // Check state after setting (with a small delay to account for React's async updates)
+        setTimeout(() => {
+          console.log('=== STATE CHECK AFTER UPDATE ===');
+          console.log('gameState after update should be lobby, actual:', gameState);
+          console.log('currentLobby after update:', currentLobby);
+          console.log('Should show lobby view:', gameState === 'lobby' && !!currentLobby);
+          
+          // Load active games after state has settled
+          loadActiveGames();
+        }, 100);
+        
       } else {
         console.error('Join lobby failed:', data);
         setError(data.error || 'Failed to join lobby');
