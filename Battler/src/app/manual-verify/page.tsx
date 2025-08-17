@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 import { useAuthStore } from '../../stores';
 
 export default function ManualVerifyPage() {
@@ -76,12 +77,12 @@ export default function ManualVerifyPage() {
             </p>
           </div>
           <div className="text-center mt-6">
-            <a
+            <Link
               href="/verify"
               className="text-blue-400 hover:text-blue-300 transition-colors"
             >
               ← Use Normal Verification Instead
-            </a>
+            </Link>
           </div>
         </div>
       </div>
@@ -121,12 +122,12 @@ export default function ManualVerifyPage() {
                 Your account is already verified and linked to {pwNation.nation_name}. You can now access all features.
               </p>
               <div className="mt-3">
-                <a
+                <Link
                   href="/"
                   className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors"
                 >
                   Go to Dashboard
-                </a>
+                </Link>
               </div>
             </div>
           )}
@@ -194,18 +195,18 @@ export default function ManualVerifyPage() {
                   🎉 <strong>Verification Complete!</strong> Your account is now verified and linked to your P&W nation.
                 </p>
                 <div className="flex gap-3">
-                  <a
+                  <Link
                     href="/"
                     className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors"
                   >
                     Go to Dashboard
-                  </a>
-                  <a
+                  </Link>
+                  <Link
                     href="/verify"
                     className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors"
                   >
                     View Verification Status
-                  </a>
+                  </Link>
                 </div>
               </div>
               
@@ -247,12 +248,12 @@ export default function ManualVerifyPage() {
         </div>
 
         <div className="text-center">
-          <a
+          <Link
             href="/verify"
             className="text-blue-400 hover:text-blue-300 transition-colors"
           >
             ← Back to Normal Verification
-          </a>
+          </Link>
         </div>
       </div>
     </div>
