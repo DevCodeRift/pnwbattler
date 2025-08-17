@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuthStore } from '../../../stores';
@@ -72,6 +72,33 @@ function RealBattleContent() {
       ships: 100
     }
   });
+
+  const checkForExistingLobby = useCallback(async () => {
+    try {
+      const response = await fetch('/api/multiplayer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get-my-lobby'
+        })
+      });
+
+      const data = await response.json();
+      if (data.lobby) {
+        console.log('Found existing lobby, rejoining:', data.lobby);
+        setCurrentLobby(data.lobby);
+        setGameState('lobby');
+        
+        // Subscribe to lobby-specific events
+        if (pusherClient) {
+          subscribeToLobbyEvents(data.lobby.id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check for existing lobby:', error);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pusherClient]);
 
   // Debug effect to track state changes
   useEffect(() => {
@@ -156,7 +183,7 @@ function RealBattleContent() {
       pusher.unsubscribe('multiplayer');
       pusher.disconnect();
     };
-  }, [session]);
+  }, [session, checkForExistingLobby]);
 
   // Update host name when session changes
   useEffect(() => {
@@ -207,32 +234,6 @@ function RealBattleContent() {
       });
     } catch (error) {
       console.error('Failed to update online status:', error);
-    }
-  };
-
-  const checkForExistingLobby = async () => {
-    try {
-      const response = await fetch('/api/multiplayer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'get-my-lobby'
-        })
-      });
-
-      const data = await response.json();
-      if (data.lobby) {
-        console.log('Found existing lobby, rejoining:', data.lobby);
-        setCurrentLobby(data.lobby);
-        setGameState('lobby');
-        
-        // Subscribe to lobby-specific events
-        if (pusherClient) {
-          subscribeToLobbyEvents(data.lobby.id);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to check for existing lobby:', error);
     }
   };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BattleSession, SimulatedNation, AttackType } from '@/types/simulation';
 
 interface EnhancedBattleInterfaceProps {
@@ -44,7 +44,7 @@ export default function EnhancedBattleInterface({ session, currentNationId, time
   }, [session]);
 
   // Calculate battle odds based on army values
-  const calculateBattleOdds = (attackType: string) => {
+  const calculateBattleOdds = useCallback((attackType: string) => {
     if (!currentNation || !enemy) return { IT: 0, MS: 0, PV: 0, UF: 0 };
     
     // Simplified odds calculation - in reality this would use the P&W algorithm
@@ -59,7 +59,7 @@ export default function EnhancedBattleInterface({ session, currentNationId, time
     if (ratio > 0.7) return { IT: 10, MS: 25, PV: 35, UF: 30 };
     if (ratio > 0.5) return { IT: 5, MS: 15, PV: 30, UF: 50 };
     return { IT: 0, MS: 5, PV: 15, UF: 80 };
-  };
+  }, [currentNation, enemy]);
 
   const calculateArmyStrength = (nation: SimulatedNation, attackType: string) => {
     switch (attackType) {
@@ -81,7 +81,7 @@ export default function EnhancedBattleInterface({ session, currentNationId, time
     if (selectedAction && currentNation && enemy) {
       setBattleOdds(calculateBattleOdds(selectedAction));
     }
-  }, [selectedAction, currentNation, enemy]);
+  }, [selectedAction, currentNation, enemy, calculateBattleOdds]);
 
   if (!currentNation || !enemy) {
     return <div>Nation not found</div>;

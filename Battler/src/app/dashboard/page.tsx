@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../stores';
@@ -78,22 +78,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!session || !isVerified) {
-      router.push('/login');
-      return;
-    }
-
-    if (!pwNation?.id) {
-      router.push('/verify');
-      return;
-    }
-
-    loadNationData();
-    loadMyGames();
-  }, [session, isVerified, pwNation]);
-
-  const loadNationData = async () => {
+  const loadNationData = useCallback(async () => {
     if (!pwNation?.id) return;
 
     try {
@@ -111,9 +96,9 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pwNation?.id]);
 
-  const loadMyGames = async () => {
+  const loadMyGames = useCallback(async () => {
     try {
       const response = await fetch('/api/multiplayer', {
         method: 'POST',
@@ -128,7 +113,22 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Failed to load my games:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!session || !isVerified) {
+      router.push('/login');
+      return;
+    }
+
+    if (!pwNation?.id) {
+      router.push('/verify');
+      return;
+    }
+
+    loadNationData();
+    loadMyGames();
+  }, [session, isVerified, pwNation, loadNationData, loadMyGames, router]);
 
   const formatNumber = (num: number) => {
     if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
@@ -386,7 +386,7 @@ export default function DashboardPage() {
                 <div key={game.id} className="bg-gray-700 rounded-lg p-4">
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h4 className="font-semibold text-white">{game.hostName}'s Game</h4>
+                      <h4 className="font-semibold text-white">{game.hostName}&apos;s Game</h4>
                       <div className="text-sm text-gray-400">
                         {game.playerCount} players • {game.myRole.isHost ? 'Host' : 'Player'}
                       </div>

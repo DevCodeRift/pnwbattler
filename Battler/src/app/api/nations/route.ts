@@ -67,12 +67,13 @@ export async function GET(request: NextRequest) {
         console.log('GraphQL network status:', result.networkStatus);
         
         // Check for GraphQL errors first
+        // @ts-ignore - result.errors can be undefined but we're checking for it
         if (result.errors && result.errors.length > 0) {
           console.error('GraphQL query returned errors:', result.errors);
           return NextResponse.json(
             { 
               error: 'GraphQL query failed',
-              details: result.errors.map((err: any) => err.message).join(', '),
+              details: result.errors!.map((err: any) => err.message).join(', '),
               graphqlErrors: result.errors
             },
             { status: 500 }

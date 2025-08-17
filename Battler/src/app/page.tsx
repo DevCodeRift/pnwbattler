@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useAuthStore } from '../stores';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import vercelMultiplayerManager from '../lib/vercel-multiplayer-manager';
 
@@ -62,7 +62,7 @@ export default function HomePage() {
   const [onlineCount, setOnlineCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
 
-  const loadMyGames = async () => {
+  const loadMyGames = useCallback(async () => {
     if (!session?.user) return;
 
     try {
@@ -79,7 +79,7 @@ export default function HomePage() {
     } catch (error) {
       console.error('Failed to load my games:', error);
     }
-  };
+  }, [session?.user]);
 
   useEffect(() => {
     // Connect to multiplayer server
@@ -168,7 +168,7 @@ export default function HomePage() {
       vercelMultiplayerManager.off('lobby-closed', handleLobbyClosed);
       vercelMultiplayerManager.off('battle-created', handleBattleCreated);
     };
-  }, [session]);
+  }, [session, loadMyGames]);
 
   const joinLobby = async (lobbyId: string, asSpectator = false) => {
     if (!session?.user?.name) {

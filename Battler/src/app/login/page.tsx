@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../stores';
@@ -12,14 +12,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [animatedText, setAnimatedText] = useState('');
 
-  const matrixTexts = [
+  const matrixTexts = useMemo(() => [
     'INITIALIZING SECURE CONNECTION...',
     'ACCESSING POLITICS & WAR DATABASE...',
     'ESTABLISHING ENCRYPTED CHANNEL...',
     'VALIDATING DIGITAL CREDENTIALS...',
     'PREPARING BATTLE SIMULATION...',
     'READY FOR AUTHENTICATION'
-  ];
+  ], []);
 
   useEffect(() => {
     // Redirect if already authenticated and verified
@@ -58,7 +58,7 @@ export default function LoginPage() {
 
     const interval = setInterval(typeText, isDeleting ? 50 : 100);
     return () => clearInterval(interval);
-  }, [session, isVerified, router]);
+  }, [session, isVerified, router, matrixTexts]);
 
   const handleDiscordLogin = async () => {
     setLoading(true);

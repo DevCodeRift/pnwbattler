@@ -1,346 +1,109 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../../stores';
-import BattleSetup from '@/components/BattleSetup';
-import BattleInterface from '@/components/BattleInterface';
-import { BattleSession } from '@/types/simulation';
 
 export default function CreateBattlePage() {
   const { data: session } = useSession();
-  const { isVerified, pwNation } = useAuthStore();
+  const { pwNation, isVerified } = useAuthStore();
   const router = useRouter();
-  const [currentSession, setCurrentSession] = useState<BattleSession | null>(null);
-  const [sessionId, setSessionId] = useState<string>('');
-  const [currentNationId, setCurrentNationId] = useState<string>('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>('');
-  const [openLobbies, setOpenLobbies] = useState<any[]>([]);
-  const [timeRemaining, setTimeRemaining] = useState<number>(0);
 
-  // Authentication check and redirect
   useEffect(() => {
-    if (!session) {
+    if (!session || !isVerified) {
       router.push('/login');
       return;
     }
-    if (!isVerified || !pwNation) {
+
+    if (!pwNation?.id) {
       router.push('/verify');
       return;
     }
   }, [session, isVerified, pwNation, router]);
 
-  useEffect(() => {
-    if (session && isVerified && pwNation) {
-      loadOpenLobbies();
-    }
-  }, [session, isVerified, pwNation]);
-
-  // Don't render content while redirecting for authentication
-  if (!session || !isVerified || !pwNation) {
+  if (!session || !isVerified || !pwNation?.id) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-300">Checking authentication...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Turn timer effect
-  useEffect(() => {
-    if (!currentSession || !currentSession.isActive || timeRemaining <= 0) {
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev <= 1) {
-          // Auto-advance turn when timer expires
-          advanceTurn();
-          return currentSession.settings.turnCooldown;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [currentSession, timeRemaining]);
-
-  // Initialize timer when session starts
-  useEffect(() => {
-    if (currentSession && currentSession.isActive) {
-      setTimeRemaining(currentSession.settings.turnCooldown);
-    }
-  }, [currentSession?.isActive]);
-
-  const advanceTurn = async () => {
-    if (!sessionId) return;
-
-    try {
-      const response = await fetch('/api/battle-simulation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'process_turn',
-          sessionId
-        })
-      });
-
-      if (response.ok) {
-        await fetchSession();
-      }
-    } catch (error) {
-      console.error('Failed to advance turn:', error);
-    }
-  };
-
-  const fetchSession = async () => {
-    if (!sessionId) return;
-
-    try {
-      const response = await fetch(`/api/battle-simulation?sessionId=${sessionId}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setCurrentSession(data.session);
-      }
-    } catch (error) {
-      console.error('Failed to fetch session:', error);
-    }
-  };
-
-  const loadOpenLobbies = async () => {
-    try {
-      const response = await fetch('/api/battle-simulation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get_open_lobbies' })
-      });
-      const data = await response.json();
-      if (data.lobbies) {
-        setOpenLobbies(data.lobbies);
-      }
-    } catch (error) {
-      console.error('Failed to load open lobbies:', error);
-    }
-  };
-
-  const createBattle = async (settings: any) => {
-    setLoading(true);
-    setError('');
-    
-    try {
-      const response = await fetch('/api/battle-simulation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'create_session',
-          ...settings,
-          hostNation: {
-            id: 'player1',
-            nation_name: 'Your Nation',
-            leader_name: 'Your Leader'
-          }
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setSessionId(data.session.id);
-        setCurrentNationId('player1');
-        
-        // Auto-start if it's an AI battle
-        if (settings.battleMode === 'ai') {
-          await startBattle(data.session.id);
-        }
-      } else {
-        setError(data.error || 'Failed to create battle');
-      }
-    } catch (error) {
-      setError('Failed to create battle');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const joinBattle = async (lobbyId: string) => {
-    setLoading(true);
-    setError('');
-    
-    try {
-      const response = await fetch('/api/battle-simulation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'join_session',
-          sessionId: lobbyId,
-          nation: {
-            id: 'player2',
-            nation_name: 'Your Nation',
-            leader_name: 'Your Leader'
-          }
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setSessionId(lobbyId);
-        setCurrentNationId('player2');
-        await startBattle(lobbyId);
-      } else {
-        setError(data.error || 'Failed to join battle');
-      }
-    } catch (error) {
-      setError('Failed to join battle');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const startBattle = async (battleSessionId: string) => {
-    try {
-      const response = await fetch('/api/battle-simulation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'start_session',
-          sessionId: battleSessionId
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        await loadSession(battleSessionId);
-      }
-    } catch (error) {
-      console.error('Failed to start battle:', error);
-    }
-  };
-
-  const loadSession = async (battleSessionId: string) => {
-    try {
-      const response = await fetch('/api/battle-simulation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'get_session',
-          sessionId: battleSessionId
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.session) {
-        setCurrentSession(data.session);
-      }
-    } catch (error) {
-      console.error('Failed to load session:', error);
-    }
-  };
-
-  const executeAction = async (action: any) => {
-    if (!currentSession || !currentNationId) return;
-    
-    try {
-      const response = await fetch('/api/battle-simulation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'execute_action',
-          sessionId: currentSession.id,
-          nationId: currentNationId,
-          battleAction: action
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success && data.session) {
-        setCurrentSession(data.session);
-      }
-    } catch (error) {
-      console.error('Failed to execute action:', error);
-    }
-  };
-
-  if (currentSession) {
-    return (
-      <div className="min-h-screen bg-gray-900">
-        <BattleInterface 
-          session={currentSession}
-          currentNationId={currentNationId}
-          timeRemaining={timeRemaining}
-          onExecuteAction={executeAction}
-        />
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white">Checking authentication...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900">
-      {loading && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg">
-            <div className="text-center">Creating battle...</div>
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 mx-6">
-          {error}
-        </div>
-      )}
-
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="border-b border-gray-700 pb-4 mb-8">
-          <h1 className="text-3xl font-bold text-white">Create Battle Simulation</h1>
-          <p className="text-gray-400 mt-2">Set up realistic Politics & War battle scenarios</p>
-        </div>
-        
-        {/* Open Lobbies */}
-        {openLobbies.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-4">Join Open Lobbies</h2>
-            <div className="grid gap-4">
-              {openLobbies.map((lobby) => (
-                <div key={lobby.id} className="bg-gray-800 rounded-lg shadow-lg p-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="font-semibold text-white">Battle Lobby</div>
-                      <div className="text-sm text-gray-400">
-                        {lobby.participants}/2 players • {lobby.settings.turnCooldown}s turns
-                      </div>
-                      <div className="text-sm text-gray-400">
-                        Economy: {lobby.settings.economyMode} • 
-                        Military: {lobby.settings.militarizationLevel} • 
-                        Spies: {lobby.settings.spyOperationsEnabled ? 'Enabled' : 'Disabled'}
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => joinBattle(lobby.id)}
-                      className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                    >
-                      Join Battle
-                    </button>
-                  </div>
-                </div>
-              ))}
+    <div className="min-h-screen bg-gray-900 text-white">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-4xl font-bold mb-8 text-center bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
+            Create Battle
+          </h1>
+          
+          <div className="bg-gray-800 rounded-lg p-8 text-center">
+            <div className="mb-6">
+              <div className="text-6xl mb-4">⚔️</div>
+              <h2 className="text-2xl font-semibold mb-4">Battle Creation</h2>
+              <p className="text-gray-300 mb-6">
+                Create custom battles and scenarios to test your strategic skills.
+              </p>
+            </div>
+            
+            <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-center gap-2 text-yellow-300">
+                <span className="text-xl">🚧</span>
+                <span className="font-medium">Coming Soon</span>
+              </div>
+              <p className="text-sm text-yellow-200/80 mt-2">
+                Battle creation features are currently under development. 
+                Check back soon for updates!
+              </p>
+            </div>
+            
+            <div className="grid md:grid-cols-2 gap-4 text-left">
+              <div className="bg-gray-700/50 rounded-lg p-4">
+                <h3 className="font-semibold text-blue-300 mb-2">🎯 Custom Scenarios</h3>
+                <p className="text-sm text-gray-300">
+                  Design your own battle scenarios with custom nations, resources, and objectives.
+                </p>
+              </div>
+              
+              <div className="bg-gray-700/50 rounded-lg p-4">
+                <h3 className="font-semibold text-green-300 mb-2">⚙️ Advanced Settings</h3>
+                <p className="text-sm text-gray-300">
+                  Configure unit types, terrain effects, and special battle conditions.
+                </p>
+              </div>
+              
+              <div className="bg-gray-700/50 rounded-lg p-4">
+                <h3 className="font-semibold text-purple-300 mb-2">🤝 Multiplayer Support</h3>
+                <p className="text-sm text-gray-300">
+                  Create battles that friends can join for cooperative or competitive gameplay.
+                </p>
+              </div>
+              
+              <div className="bg-gray-700/50 rounded-lg p-4">
+                <h3 className="font-semibold text-red-300 mb-2">📊 Analytics</h3>
+                <p className="text-sm text-gray-300">
+                  Track battle statistics and analyze performance across different scenarios.
+                </p>
+              </div>
+            </div>
+            
+            <div className="mt-8 flex gap-4 justify-center">
+              <button 
+                onClick={() => router.push('/battle')}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+              >
+                Back to Battles
+              </button>
+              <button 
+                onClick={() => router.push('/battle/real')}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors"
+              >
+                Join Multiplayer
+              </button>
             </div>
           </div>
-        )}
-
-        {/* Battle Setup */}
-        <BattleSetup onCreateBattle={createBattle} />
+        </div>
       </div>
     </div>
   );
