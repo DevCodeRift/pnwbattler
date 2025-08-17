@@ -23,14 +23,23 @@ export async function GET(request: NextRequest) {
 
     if (nationId) {
       query = `{
-        nations(id: [${nationId}]) {
+        nations(id: [${parseInt(nationId, 10)}]) {
           data {
             id
             nation_name
             leader_name
             continent
             color
+            alliance_id
+            alliance {
+              id
+              name
+            }
             score
+            soldiers
+            tanks
+            aircraft
+            ships
           }
         }
       }`;
@@ -43,7 +52,16 @@ export async function GET(request: NextRequest) {
             leader_name
             continent
             color
+            alliance_id
+            alliance {
+              id
+              name
+            }
             score
+            soldiers
+            tanks
+            aircraft
+            ships
           }
         }
       }`;

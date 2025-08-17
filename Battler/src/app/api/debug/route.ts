@@ -28,6 +28,10 @@ export async function GET(request: NextRequest) {
           id
           nation_name
           leader_name
+          alliance {
+            id
+            name
+          }
         }
       }
     }`;

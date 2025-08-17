@@ -36,7 +36,7 @@ export const apolloClient = new ApolloClient({
 
 // GraphQL Queries for Politics and War API
 export const GET_NATION_BY_ID = gql`
-  query GetNation($id: ID!) {
+  query GetNation($id: Int!) {
     nations(id: [$id]) {
       data {
         id
@@ -45,11 +45,20 @@ export const GET_NATION_BY_ID = gql`
         continent
         color
         alliance_id
+        alliance {
+          id
+          name
+        }
         score
         soldiers
         tanks
         aircraft
         ships
+        missiles
+        nukes
+        money
+        wars_won
+        wars_lost
       }
     }
   }
@@ -65,11 +74,20 @@ export const GET_NATION_BY_NAME = gql`
         continent
         color
         alliance_id
+        alliance {
+          id
+          name
+        }
         score
         soldiers
         tanks
         aircraft
         ships
+        missiles
+        nukes
+        money
+        wars_won
+        wars_lost
       }
     }
   }

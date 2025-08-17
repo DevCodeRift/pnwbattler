@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     if (nationId) {
       const { data } = await apolloClient.query({
         query: GET_NATION_BY_ID,
-        variables: { id: nationId },
+        variables: { id: parseInt(nationId, 10) },
       });
       const nations = data.nations?.data || [];
       return NextResponse.json({ nation: nations[0] || null });
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
         try {
           const { data } = await apolloClient.query({
             query: GET_NATION_BY_ID,
-            variables: { id },
+            variables: { id: parseInt(id, 10) },
           });
           const nations = data.nations?.data || [];
           return nations[0] || null;
