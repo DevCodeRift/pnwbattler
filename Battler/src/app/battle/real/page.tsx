@@ -350,7 +350,15 @@ function RealBattleContent() {
     }
   };
 
+  // Simple test function to verify button clicks work
+  const testButtonClick = () => {
+    console.log('🧪 TEST BUTTON CLICKED - Button functionality is working!');
+    alert('Button click test successful!');
+  };
+
   const joinLobby = async (lobbyId: string) => {
+    console.log('🚀 JOIN LOBBY FUNCTION CALLED!', { lobbyId, userName: session?.user?.name });
+    
     if (!session?.user?.name) {
       setError('Please log in to join lobbies');
       return;
@@ -533,6 +541,7 @@ function RealBattleContent() {
         <div className="bg-purple-800 rounded p-2 mb-4 text-sm">
           <p>Debug State - GameState: {gameState} | Has Lobby: {!!currentLobby} | Session: {session?.user?.name}</p>
           {currentLobby && <p>Current Lobby: ID={currentLobby.id}, Players={currentLobby.playerCount}</p>}
+          <p>Session Status: {session ? 'Authenticated' : 'Not authenticated'} | Loading: {loading}</p>
         </div>
 
         {/* Error Display */}
@@ -705,7 +714,10 @@ function RealBattleContent() {
                               </p>
                             </div>
                             <button
-                              onClick={() => joinLobby(lobby.id)}
+                              onClick={() => {
+                                console.log('🔘 JOIN BUTTON CLICKED!', { lobbyId: lobby.id, loading, disabled: loading || lobby.playerCount >= settings.maxPlayers });
+                                joinLobby(lobby.id);
+                              }}
                               disabled={loading || lobby.playerCount >= settings.maxPlayers}
                               className="bg-green-600 hover:bg-green-700 disabled:opacity-50 px-4 py-2 rounded text-sm"
                             >
