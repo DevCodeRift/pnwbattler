@@ -39,7 +39,7 @@ interface UIState {
   setError: (error: string | null) => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   pwNation: null,
@@ -51,7 +51,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     pwNation: null, 
     isVerified: false 
   }),
-  setPWNation: (nation) => set({ pwNation: nation }),
+  setPWNation: (nation) => {
+    set({ pwNation: nation });
+    // Auto-verify if nation is set
+    if (nation) {
+      set({ isVerified: true });
+    }
+  },
   setVerified: (verified) => set({ isVerified: verified }),
 }));
 

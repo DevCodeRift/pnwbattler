@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../stores';
 
 export default function VerifyPage() {
   const { data: session } = useSession();
   const { setPWNation, setVerified, isVerified, pwNation } = useAuthStore();
+  const router = useRouter();
   
   const [step, setStep] = useState<'search' | 'code' | 'success'>('search');
   const [nationInput, setNationInput] = useState('');
@@ -16,6 +18,15 @@ export default function VerifyPage() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [generatedCode, setGeneratedCode] = useState('');
+
+  // Redirect if already verified
+  useEffect(() => {
+    if (isVerified && pwNation) {
+      router.push('/dashboard');
+    } else if (!session) {
+      router.push('/login');
+    }
+  }, [session, isVerified, pwNation, router]);
 
   const searchNation = async () => {
     if (!nationInput.trim()) {
@@ -131,6 +142,11 @@ export default function VerifyPage() {
       setVerified(true);
       setStep('success');
       setError('');
+      
+      // Redirect to dashboard after successful verification
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 2000);
     } catch (err: any) {
       setError(err.message || 'Failed to verify code');
     } finally {

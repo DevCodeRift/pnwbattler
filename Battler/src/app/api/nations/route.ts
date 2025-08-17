@@ -48,6 +48,19 @@ export async function GET(request: NextRequest) {
         });
         
         console.log('GraphQL result object:', result);
+        
+        if (result.data?.nations?.data?.[0]) {
+          const nation = result.data.nations.data[0];
+          return NextResponse.json({ 
+            nation,
+            _message: 'Data fetched from Politics & War API'
+          });
+        } else {
+          return NextResponse.json({
+            error: 'Nation not found',
+            nation: null
+          }, { status: 404 });
+        }
         console.log('GraphQL data:', JSON.stringify(result.data, null, 2));
         console.log('GraphQL errors:', result.errors);
         console.log('GraphQL loading:', result.loading);

@@ -38,6 +38,11 @@ export default function Header() {
           <Link href="/" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
             Home
           </Link>
+          {session && (
+            <Link href="/dashboard" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+              Dashboard
+            </Link>
+          )}
           <Link href="/battles" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
             Battles
           </Link>

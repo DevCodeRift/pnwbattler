@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useAuthStore } from '../stores';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import vercelMultiplayerManager from '../lib/vercel-multiplayer-manager';
 
 interface Lobby {
@@ -47,7 +48,15 @@ interface MyGame {
 export default function HomePage() {
   const { data: session } = useSession();
   const { pwNation, isVerified } = useAuthStore();
+  const router = useRouter();
   const [activeLobbies, setActiveLobbies] = useState<Lobby[]>([]);
+
+  // Redirect authenticated and verified users to dashboard
+  useEffect(() => {
+    if (session && isVerified && pwNation) {
+      router.push('/dashboard');
+    }
+  }, [session, isVerified, pwNation, router]);
   const [activeBattles, setActiveBattles] = useState<Battle[]>([]);
   const [myGames, setMyGames] = useState<MyGame[]>([]);
   const [onlineCount, setOnlineCount] = useState(0);
