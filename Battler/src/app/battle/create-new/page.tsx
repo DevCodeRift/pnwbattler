@@ -182,6 +182,7 @@ export default function CreateBattlePage() {
         <BattleInterface 
           session={currentSession}
           currentNationId={currentNationId}
+          timeRemaining={currentSession.settings.turnCooldown}
           onExecuteAction={executeAction}
         />
       </div>

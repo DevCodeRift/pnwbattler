@@ -12,10 +12,74 @@ export default function CreateBattlePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [openLobbies, setOpenLobbies] = useState<any[]>([]);
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
 
   useEffect(() => {
     loadOpenLobbies();
   }, []);
+
+  // Turn timer effect
+  useEffect(() => {
+    if (!currentSession || !currentSession.isActive || timeRemaining <= 0) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          // Auto-advance turn when timer expires
+          advanceTurn();
+          return currentSession.settings.turnCooldown;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [currentSession, timeRemaining]);
+
+  // Initialize timer when session starts
+  useEffect(() => {
+    if (currentSession && currentSession.isActive) {
+      setTimeRemaining(currentSession.settings.turnCooldown);
+    }
+  }, [currentSession?.isActive]);
+
+  const advanceTurn = async () => {
+    if (!sessionId) return;
+
+    try {
+      const response = await fetch('/api/battle-simulation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'process_turn',
+          sessionId
+        })
+      });
+
+      if (response.ok) {
+        await fetchSession();
+      }
+    } catch (error) {
+      console.error('Failed to advance turn:', error);
+    }
+  };
+
+  const fetchSession = async () => {
+    if (!sessionId) return;
+
+    try {
+      const response = await fetch(`/api/battle-simulation?sessionId=${sessionId}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setCurrentSession(data.session);
+      }
+    } catch (error) {
+      console.error('Failed to fetch session:', error);
+    }
+  };
 
   const loadOpenLobbies = async () => {
     try {
@@ -182,6 +246,7 @@ export default function CreateBattlePage() {
         <BattleInterface 
           session={currentSession}
           currentNationId={currentNationId}
+          timeRemaining={timeRemaining}
           onExecuteAction={executeAction}
         />
       </div>

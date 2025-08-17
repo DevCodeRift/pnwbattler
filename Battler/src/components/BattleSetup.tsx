@@ -23,7 +23,7 @@ export default function BattleSetup({ onCreateBattle }: BattleSetupProps) {
     hangars: 5,
     drydocks: 0
   });
-  const [customResources, setCustomResources] = useState(ECONOMY_PRESETS.LIMITED);
+  const [customResources, setCustomResources] = useState(ECONOMY_PRESETS[EconomyMode.LIMITED]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

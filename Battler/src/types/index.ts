@@ -345,3 +345,6 @@ export interface PWVerification {
   expires_at: string;
   created_at: string;
 }
+
+// Re-export all simulation types
+export * from './simulation';

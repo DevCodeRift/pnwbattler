@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
         return handleGetOpenLobbies();
       case 'execute_action':
         return handleExecuteAction(data);
+      case 'process_turn':
+        return handleProcessTurn(data);
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
@@ -136,10 +138,12 @@ async function handleGetSession(data: any) {
 }
 
 async function handleGetOpenLobbies() {
-  const lobbies = battleEngine.getOpenLobbies();
+  const lobbies = battleEngine.getAllSessions().filter(session => 
+    session.mode === BattleMode.OPEN_LOBBY && !session.isActive
+  );
   
   return NextResponse.json({ 
-    lobbies: lobbies.map(lobby => ({
+    lobbies: lobbies.map((lobby: any) => ({
       id: lobby.id,
       mode: lobby.mode,
       participants: lobby.participants.length,
@@ -177,4 +181,24 @@ async function sendInvitationMessage(nationId: string, sessionId: string, custom
   
   // TODO: Implement actual Politics & War API integration
   // This would require the PnW API endpoint for sending messages
+}
+
+async function handleProcessTurn(data: any) {
+  const { sessionId } = data;
+  
+  if (!sessionId) {
+    return NextResponse.json({ error: 'Session ID required' }, { status: 400 });
+  }
+
+  const success = battleEngine.processTurn(sessionId);
+  
+  if (!success) {
+    return NextResponse.json({ error: 'Failed to process turn' }, { status: 400 });
+  }
+
+  const session = battleEngine.getSession(sessionId);
+  return NextResponse.json({ 
+    success: true,
+    session
+  });
 }

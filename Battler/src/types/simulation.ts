@@ -18,6 +18,30 @@ export enum MilitarizationLevel {
   CUSTOM = 'custom'
 }
 
+// MAP (Military Action Points) System
+export const MAP_CONSTANTS = {
+  STARTING_MAPS: 6,
+  MAPS_PER_TURN: 1,
+  MAX_MAPS: 12,
+  GROUND_ATTACK_COST: 3,
+  AIR_ATTACK_COST: 4,
+  NAVAL_ATTACK_COST: 4
+};
+
+// Building Limits
+export const BUILDING_LIMITS = {
+  MAX_BARRACKS: 5,
+  MAX_FACTORIES: 5,
+  MAX_HANGARS: 5,
+  MAX_DRYDOCKS: 3
+};
+
+export enum AttackType {
+  GROUND = 'ground',
+  AIR = 'air',
+  NAVAL = 'naval'
+}
+
 export interface MilitaryBuild {
   barracks: number;
   factories: number;
@@ -63,6 +87,9 @@ export interface SimulationSettings {
 }
 
 export interface CityBuild {
+  id?: string;
+  name?: string;
+  nation_id?: string;
   infrastructure: number;
   land: number;
   powered: boolean;
@@ -116,6 +143,8 @@ export interface SimulatedNation {
   score: number;
   population: number;
   land: number;
+  maps: number; // Military Action Points - starts at 6, gains 1 per turn
+  maxMaps: number; // Maximum MAPs (usually 12)
 }
 
 export interface BattleSession {
@@ -136,8 +165,38 @@ export interface BattleAction {
   nationId: string;
   turn: number;
   action: 'attack' | 'recruit' | 'spy' | 'purchase' | 'policy_change';
-  details: any;
+  details: AttackAction | RecruitAction | SpyAction | PurchaseAction | PolicyAction;
   timestamp: string;
+  mapsCost?: number;
+}
+
+export interface AttackAction {
+  type: AttackType;
+  target: string;
+  result?: {
+    success: boolean;
+    damage: number;
+    losses: Partial<MilitaryBuild>;
+  };
+}
+
+export interface RecruitAction {
+  unitType: keyof MilitaryBuild;
+  quantity: number;
+}
+
+export interface SpyAction {
+  operation: SpyOperation;
+}
+
+export interface PurchaseAction {
+  cityId: string;
+  upgrade: CityUpgrade;
+}
+
+export interface PolicyAction {
+  policyType: 'war_policy' | 'domestic_policy';
+  newPolicy: string;
 }
 
 export interface SpyOperation {
@@ -161,16 +220,16 @@ export interface CityUpgrade {
 }
 
 export const DEFCON_BUILDS = {
-  PEACETIME_PLANES: { barracks: 0, factories: 0, hangars: 5, drydocks: 0 },
-  PEACETIME_MIXED: { barracks: 0, factories: 2, hangars: 5, drydocks: 0 },
-  HIGH_ALERT: { barracks: 5, factories: 5, hangars: 5, drydocks: 0 },
-  FULL_WAR: { barracks: 5, factories: 5, hangars: 5, drydocks: 3 }
+  [MilitarizationLevel.ZERO]: { barracks: 0, factories: 0, hangars: 0, drydocks: 0 },
+  [MilitarizationLevel.PARTIAL]: { barracks: 2, factories: 2, hangars: 3, drydocks: 1 },
+  [MilitarizationLevel.MAXED]: { barracks: 5, factories: 5, hangars: 5, drydocks: 3 },
+  [MilitarizationLevel.CUSTOM]: { barracks: 0, factories: 0, hangars: 0, drydocks: 0 }
 };
 
 export const TURN_COOLDOWNS = [30, 60, 120, 300]; // seconds
 
 export const ECONOMY_PRESETS = {
-  UNLIMITED: {
+  [EconomyMode.UNLIMITED]: {
     money: 999999999,
     oil: 999999999,
     food: 999999999,
@@ -184,7 +243,7 @@ export const ECONOMY_PRESETS = {
     bauxite: 999999999,
     lead: 999999999
   },
-  LIMITED: {
+  [EconomyMode.LIMITED]: {
     money: 1000000,
     oil: 10000,
     food: 10000,
@@ -198,7 +257,7 @@ export const ECONOMY_PRESETS = {
     bauxite: 10000,
     lead: 10000
   },
-  MINIMAL: {
+  [EconomyMode.MINIMAL]: {
     money: 50000,
     oil: 100,
     food: 500,
