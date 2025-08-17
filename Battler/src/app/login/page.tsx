@@ -71,7 +71,7 @@ export default function LoginPage() {
   };
 
   const MatrixRain = () => {
-    const columns = 50;
+    const columns = 30; // Reduced from 50
     const drops = Array.from({ length: columns }, () => Math.random() * 20);
     
     return (
@@ -85,7 +85,7 @@ export default function LoginPage() {
               animationDelay: `${drop}s`,
             }}
           >
-            {Array.from({ length: 20 }, (_, j) => (
+            {Array.from({ length: 12 }, (_, j) => ( // Reduced from 20 to 12
               <div key={j} className="matrix-char">
                 {String.fromCharCode(0x30A0 + Math.random() * 96)}
               </div>
@@ -103,8 +103,8 @@ export default function LoginPage() {
           position: fixed;
           top: 0;
           left: 0;
-          width: 100%;
-          height: 100%;
+          width: 100vw;
+          height: 100vh;
           overflow: hidden;
           z-index: 1;
           pointer-events: none;
@@ -117,16 +117,19 @@ export default function LoginPage() {
           color: #00ff41;
           animation: fall 10s linear infinite;
           opacity: 0.8;
+          white-space: nowrap;
         }
         
         .matrix-char {
+          display: block;
           text-shadow: 0 0 10px #00ff41;
           animation: glow 2s ease-in-out infinite alternate;
+          line-height: 1.2;
         }
         
         @keyframes fall {
-          0% { transform: translateY(-100vh); }
-          100% { transform: translateY(100vh); }
+          0% { transform: translateY(-50vh); }
+          100% { transform: translateY(150vh); }
         }
         
         @keyframes glow {
@@ -185,11 +188,21 @@ export default function LoginPage() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-black relative overflow-hidden">
-        <MatrixRain />
+      <div className="h-screen bg-black relative overflow-hidden">
+        {/* Simple cyber background pattern */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-900/20 via-black to-green-900/20"></div>
+          <div className="absolute inset-0" style={{
+            backgroundImage: `
+              linear-gradient(90deg, rgba(0,255,65,0.1) 1px, transparent 1px),
+              linear-gradient(rgba(0,255,65,0.1) 1px, transparent 1px)
+            `,
+            backgroundSize: '20px 20px'
+          }}></div>
+        </div>
         
-        <div className="relative z-10 min-h-screen flex items-center justify-center p-4 py-8">
-          <div className="max-w-sm w-full my-auto">
+        <div className="relative z-10 h-full flex items-center justify-center p-4">
+          <div className="max-w-sm w-full">
             {/* Logo/Title */}
             <div className="text-center mb-4">
               <h1 className="text-2xl font-bold text-green-400 neon-text mb-1">
