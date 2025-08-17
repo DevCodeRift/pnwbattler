@@ -285,36 +285,17 @@ export default function VerifyPage() {
               )}
               
               <div className="bg-blue-900/30 border border-blue-600/30 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-blue-200 mb-2">Verification Code Generated</h3>
-                <p className="text-blue-100 text-sm mb-3">
-                  To verify your account, please send <strong>$1</strong> to the nation <strong>&quot;PnW Battler Bot&quot;</strong> (ID: 123456) with the following code in the note:
+                <h3 className="text-lg font-semibold text-blue-200 mb-2">Verification Code Sent</h3>
+                <p className="text-blue-100 text-sm">
+                  A verification code has been sent to your Politics & War inbox. Please check your messages and enter the code below to complete verification.
                 </p>
-                <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 mb-3">
-                  <p className="text-white font-mono text-lg text-center">{generatedCode || 'Loading...'}</p>
-                </div>
-                <div className="bg-yellow-900/30 border border-yellow-600/30 rounded-lg p-3 mb-3">
-                  <p className="text-yellow-200 text-sm">
-                    <strong>Instructions:</strong>
-                  </p>
-                  <ol className="text-yellow-100 text-sm mt-1 ml-4 list-decimal space-y-1">
-                    <li>Go to your nation&apos;s Trade page</li>
-                    <li>Click &quot;Send Money&quot;</li>
-                    <li>Enter Nation ID: <strong>123456</strong></li>
-                    <li>Amount: <strong>$1</strong></li>
-                    <li>Note: <strong>{generatedCode || 'Your verification code'}</strong></li>
-                    <li>Click Send, then return here and click &quot;Verify&quot;</li>
-                  </ol>
-                  <p className="text-yellow-100 text-xs mt-2">
-                    💰 <em>Don&apos;t worry - the $1 will be automatically returned to you after verification!</em>
-                  </p>
-                </div>
-                <p className="text-blue-200 text-sm">
-                  <strong>Tip:</strong> If you need a new code, click &quot;Resend Code&quot; below.
+                <p className="text-blue-200 text-sm mt-2">
+                  <strong>Tip:</strong> If you don&apos;t receive the code, you can click &quot;Resend Code&quot; to get a new one.
                 </p>
-                {generatedCode && process.env.NODE_ENV === 'development' && (
-                  <div className="mt-3 p-3 bg-green-900/30 border border-green-600/30 rounded">
-                    <p className="text-green-200 text-sm">
-                      <strong>Development Mode:</strong> You can skip the bank transfer and just enter the code above to proceed.
+                {generatedCode && (
+                  <div className="mt-3 p-3 bg-yellow-900/30 border border-yellow-600/30 rounded">
+                    <p className="text-yellow-200 text-sm">
+                      <strong>Development Mode:</strong> Your verification code is: <strong>{generatedCode}</strong>
                     </p>
                   </div>
                 )}
@@ -325,7 +306,7 @@ export default function VerifyPage() {
                   Verification Code
                 </label>
                 <p className="text-gray-400 text-sm mb-2">
-                  Enter the verification code you sent in the bank transfer note:
+                  Enter the verification code from the message sent to your P&W inbox:
                 </p>
                 <input
                   type="text"

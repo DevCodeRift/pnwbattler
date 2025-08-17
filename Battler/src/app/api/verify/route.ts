@@ -81,18 +81,12 @@ export async function POST(request: NextRequest) {
 
     // Send verification message to the nation via P&W REST API
     try {
-      const messageSubject = 'PnW Battler - Account Verification';
-      const messageBody = `Hello! 
-
-Your verification code for PnW Battler is: ${code}
+      const messageSubject = 'PnW Battler Verification Code';
+      const messageBody = `Your verification code for PnW Battler is: ${code}
 
 Please enter this code on the verification page to link your Politics & War account with your Discord account.
 
-This code will expire in 30 minutes.
-
-If you did not request this verification, please ignore this message.
-
-- PnW Battler Team`;
+This code will expire in 30 minutes. If you did not request this verification, please ignore this message.`;
 
       const apiKey = process.env.PW_BOT_API_KEY || process.env.NEXT_PUBLIC_PW_API_KEY;
       
