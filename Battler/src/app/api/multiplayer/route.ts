@@ -565,25 +565,11 @@ export async function POST(request: NextRequest) {
       }
 
       case 'leave-lobby': {
-        const { lobbyId, playerName } = data;
+        const { lobbyId } = data;
         
-        // Remove player or spectator
-        await Promise.all([
-          prisma.player.deleteMany({
-            where: {
-              lobbyId,
-              name: playerName,
-            },
-          }),
-          prisma.spectator.deleteMany({
-            where: {
-              lobbyId,
-              name: playerName,
-            },
-          }),
-        ]);
-
-        // Check if lobby is now empty
+        console.log('Leave lobby request:', { lobbyId, discordId });
+        
+        // Find the player/spectator to remove using Discord ID
         const lobby = await prisma.lobby.findUnique({
           where: { id: lobbyId },
           include: {
@@ -592,33 +578,118 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        if (lobby && lobby.players.length === 0 && lobby.spectators.length === 0) {
-          // Delete empty lobby
-          await prisma.lobby.delete({
-            where: { id: lobbyId },
-          });
+        if (!lobby) {
+          return NextResponse.json({ error: 'Lobby not found' }, { status: 404 });
+        }
 
-          await pusher.trigger('multiplayer', 'lobby-closed', { lobbyId });
-        } else if (lobby) {
-          // Update lobby activity since there was player movement
+        // Find the leaving player
+        const leavingPlayer = lobby.players.find((player: any) => player.discordId === discordId);
+        const leavingSpectator = lobby.spectators.find((spectator: any) => spectator.name === userName);
+        
+        if (!leavingPlayer && !leavingSpectator) {
+          return NextResponse.json({ error: 'You are not in this lobby' }, { status: 400 });
+        }
+
+        const wasHost = leavingPlayer?.isHost || false;
+        const playerName = leavingPlayer?.name || leavingSpectator?.name || userName;
+
+        // Remove the player/spectator
+        if (leavingPlayer) {
+          await prisma.player.delete({
+            where: { id: leavingPlayer.id },
+          });
+        }
+        if (leavingSpectator) {
+          await prisma.spectator.delete({
+            where: { id: leavingSpectator.id },
+          });
+        }
+
+        // Get updated lobby
+        const updatedLobby = await prisma.lobby.findUnique({
+          where: { id: lobbyId },
+          include: {
+            players: true,
+            spectators: true,
+          },
+        });
+
+        if (!updatedLobby) {
+          return NextResponse.json({ success: true });
+        }
+
+        // Handle host leaving
+        if (wasHost) {
+          if (updatedLobby.players.length > 0) {
+            // Transfer host to the first remaining player
+            const newHost = updatedLobby.players[0];
+            await prisma.player.update({
+              where: { id: newHost.id },
+              data: { isHost: true },
+            });
+
+            // Update lobby host name
+            await prisma.lobby.update({
+              where: { id: lobbyId },
+              data: { hostName: newHost.name },
+            });
+
+            console.log(`Host transferred from ${playerName} to ${newHost.name}`);
+          } else {
+            // No players left, delete the lobby
+            await prisma.lobby.delete({
+              where: { id: lobbyId },
+            });
+
+            console.log(`Lobby ${lobbyId} deleted - host left and no players remaining`);
+            await pusher.trigger('multiplayer', 'lobby-closed', { lobbyId });
+            await pusher.trigger(`lobby-${lobbyId}`, 'lobby-closed', {
+              lobbyId,
+              message: 'Lobby closed - host left the game',
+            });
+
+            return NextResponse.json({ success: true, lobbyDeleted: true });
+          }
+        }
+
+        // Get final lobby state
+        const finalLobby = await prisma.lobby.findUnique({
+          where: { id: lobbyId },
+          include: {
+            players: true,
+            spectators: true,
+          },
+        });
+
+        if (finalLobby) {
+          // Update lobby activity
           await updateLobbyActivity(lobbyId);
           
           const formattedLobby = {
-            id: lobby.id,
-            hostName: lobby.hostName,
-            playerCount: lobby.players.length,
-            spectatorCount: lobby.spectators.length,
-            status: lobby.status,
-            settings: lobby.settings,
-            createdAt: lobby.createdAt.toISOString(),
+            id: finalLobby.id,
+            hostName: finalLobby.hostName,
+            playerCount: finalLobby.players.length,
+            spectatorCount: finalLobby.spectators.length,
+            status: finalLobby.status,
+            settings: finalLobby.settings,
+            createdAt: finalLobby.createdAt.toISOString(),
+            players: finalLobby.players.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              isHost: p.isHost,
+              isReady: p.isReady
+            }))
           };
 
           await pusher.trigger('multiplayer', 'lobby-updated', formattedLobby);
           await pusher.trigger(`lobby-${lobbyId}`, 'player-left', {
             playerName,
+            wasHost,
             lobby: formattedLobby,
             lobbyId: lobbyId,
           });
+
+          console.log(`Player ${playerName} left lobby ${lobbyId}. ${wasHost ? 'Was host.' : ''}`);
         }
 
         return NextResponse.json({ success: true });

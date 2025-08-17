@@ -309,6 +309,13 @@ function RealBattleContent() {
       setGameState('setup');
       setError(eventData.message || 'Lobby was closed');
     });
+
+    lobbyChannel.bind('player-left', (eventData: any) => {
+      console.log('Player left lobby:', eventData);
+      if (eventData.lobby) {
+        setCurrentLobby(eventData.lobby);
+      }
+    });
   };
 
   const createLobby = async () => {
@@ -428,6 +435,46 @@ function RealBattleContent() {
     } finally {
       console.log('=== JOIN LOBBY FINALLY ===');
       console.log('Setting loading to false');
+      setLoading(false);
+    }
+  };
+
+  const leaveLobby = async () => {
+    if (!currentLobby) return;
+
+    console.log('🚪 Leaving lobby:', { lobbyId: currentLobby.id });
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/multiplayer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'leave-lobby',
+          lobbyId: currentLobby.id,
+        })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        console.log('✅ Successfully left lobby');
+        
+        // Reset state to setup view
+        setCurrentLobby(null);
+        setGameState('setup');
+        
+        // Refresh active games list
+        await loadActiveGames();
+      } else {
+        console.error('❌ Failed to leave lobby:', data);
+        setError(data.error || 'Failed to leave lobby');
+      }
+    } catch (error) {
+      console.error('❌ Error leaving lobby:', error);
+      setError('Network error while leaving lobby');
+    } finally {
       setLoading(false);
     }
   };
@@ -863,7 +910,7 @@ function RealBattleContent() {
                   </button>
                 )}
                 <button
-                  onClick={() => setGameState('setup')}
+                  onClick={leaveLobby}
                   className="bg-gray-600 hover:bg-gray-700 px-6 py-3 rounded-lg font-semibold"
                 >
                   Leave Lobby
