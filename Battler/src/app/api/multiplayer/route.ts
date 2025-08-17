@@ -456,6 +456,22 @@ export async function POST(request: NextRequest) {
         // Update lobby activity before starting battle
         await updateLobbyActivity(lobbyId);
 
+        // Check for existing battle and clean it up if it exists
+        const existingBattle = await prisma.battle.findUnique({
+          where: { lobbyId }
+        });
+
+        if (existingBattle) {
+          console.log('Found existing battle for lobby, cleaning up:', existingBattle.id);
+          
+          // Delete existing battle (this will cascade to battle actions)
+          await prisma.battle.delete({
+            where: { id: existingBattle.id }
+          });
+          
+          console.log('Existing battle cleaned up successfully');
+        }
+
         // Update lobby status
         await prisma.lobby.update({
           where: { id: lobbyId },
@@ -715,6 +731,87 @@ export async function POST(request: NextRequest) {
         }
 
         return NextResponse.json({ success: true });
+      }
+
+      case 'cancel-battle': {
+        const { lobbyId } = data;
+        
+        console.log('Cancel battle request:', { lobbyId, discordId });
+        
+        const lobby = await prisma.lobby.findUnique({
+          where: { id: lobbyId },
+          include: {
+            players: true,
+            battle: true,
+          },
+        });
+
+        if (!lobby) {
+          return NextResponse.json({ error: 'Lobby not found' }, { status: 404 });
+        }
+
+        // Check if the requesting user is a player in the lobby
+        const player = lobby.players.find((p: any) => p.discordId === discordId);
+        if (!player) {
+          return NextResponse.json({ error: 'You are not a player in this lobby' }, { status: 403 });
+        }
+
+        // Delete any existing battle
+        if (lobby.battle) {
+          await prisma.battle.delete({
+            where: { id: lobby.battle.id }
+          });
+          console.log('Battle cancelled and deleted:', lobby.battle.id);
+        }
+
+        // Reset lobby status to WAITING and reset all players to not ready
+        await prisma.lobby.update({
+          where: { id: lobbyId },
+          data: { status: 'WAITING' },
+        });
+
+        await prisma.player.updateMany({
+          where: { lobbyId },
+          data: { isReady: false }
+        });
+
+        // Get updated lobby
+        const updatedLobby = await prisma.lobby.findUnique({
+          where: { id: lobbyId },
+          include: {
+            players: true,
+            spectators: true,
+          },
+        });
+
+        const formattedLobby = {
+          id: updatedLobby!.id,
+          hostName: updatedLobby!.hostName,
+          playerCount: updatedLobby!.players.length,
+          spectatorCount: updatedLobby!.spectators.length,
+          status: updatedLobby!.status,
+          settings: updatedLobby!.settings,
+          createdAt: updatedLobby!.createdAt.toISOString(),
+          players: updatedLobby!.players.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            isHost: p.isHost,
+            isReady: p.isReady
+          }))
+        };
+
+        // Broadcast battle cancellation
+        await pusher.trigger('multiplayer', 'lobby-updated', formattedLobby);
+        await pusher.trigger(`lobby-${lobbyId}`, 'battle-cancelled', {
+          message: 'Battle was cancelled, lobby reset',
+          lobby: formattedLobby,
+        });
+
+        return NextResponse.json({ 
+          success: true,
+          lobby: formattedLobby,
+          message: 'Battle cancelled successfully'
+        });
       }
 
       default:
