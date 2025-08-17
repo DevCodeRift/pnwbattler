@@ -273,7 +273,17 @@ export class BattleSimulationEngine {
       outcome: outcomeMap[battleResult.outcome as keyof typeof outcomeMap],
       attackerLosses: battleResult.attackerLosses,
       defenderLosses: battleResult.defenderLosses,
-      resourcesUsed: battleResult.resourcesUsed
+      resourcesUsed: battleResult.resourcesUsed,
+      battleCalculations: battleResult.battleCalculations || {
+        attackerUnitsUsed: { soldiers: 0, tanks: 0, aircraft: 0, ships: 0 },
+        defenderUnitsDefending: { soldiers: 0, tanks: 0, aircraft: 0, ships: 0 },
+        attackerStrength: 0,
+        defenderStrength: 0,
+        strengthRatio: 1,
+        rollResults: { roll1: 0, roll2: 0, roll3: 0, bestRoll: 0 },
+        hadMunitions: false,
+        hadGasoline: false
+      }
     };
     
     session.battleHistory.push(historyEntry);
@@ -325,6 +335,29 @@ export class BattleSimulationEngine {
     // Calculate resource consumption
     const resourcesUsed = this.calculateResourceConsumption(attacker, attackType);
     
+    // Prepare detailed battle calculations
+    const battleCalculations = {
+      attackerUnitsUsed: {
+        soldiers: attacker.military.soldiers,
+        tanks: attacker.military.tanks
+      },
+      defenderUnitsDefending: {
+        soldiers: defender.military.soldiers,
+        tanks: defender.military.tanks
+      },
+      attackerStrength: attackerArmyValue,
+      defenderStrength: defenderArmyValue,
+      strengthRatio: attackerArmyValue / Math.max(defenderArmyValue, 1),
+      rollResults: {
+        roll1: attackerRolls[0],
+        roll2: attackerRolls[1],
+        roll3: attackerRolls[2],
+        bestRoll: Math.max(...attackerRolls)
+      },
+      hadMunitions: attacker.resources.munitions > 0,
+      hadGasoline: attacker.resources.gasoline > 0
+    };
+    
     console.log('Battle outcome:', outcome, 'Attacker wins:', attackerWins);
     
     return {
@@ -334,6 +367,7 @@ export class BattleSimulationEngine {
       attackerLosses,
       defenderLosses,
       resourcesUsed,
+      battleCalculations,
       rolls: { attacker: attackerRolls, defender: defenderRolls }
     };
   }
@@ -474,6 +508,33 @@ export class BattleSimulationEngine {
     
     const resourcesUsed = this.calculateResourceConsumption(attacker, attackType);
     
+    // Prepare detailed battle calculations for air/naval
+    const battleCalculations = {
+      attackerUnitsUsed: {
+        soldiers: attackType === AttackType.AIR ? 0 : 0,
+        tanks: 0,
+        aircraft: attackType === AttackType.AIR ? attacker.military.aircraft : 0,
+        ships: attackType === AttackType.NAVAL ? attacker.military.ships : 0
+      },
+      defenderUnitsDefending: {
+        soldiers: 0,
+        tanks: 0,
+        aircraft: attackType === AttackType.AIR ? defender.military.aircraft : 0,
+        ships: attackType === AttackType.NAVAL ? defender.military.ships : 0
+      },
+      attackerStrength: attackerArmyValue,
+      defenderStrength: defenderArmyValue,
+      strengthRatio: attackerArmyValue / Math.max(defenderArmyValue, 1),
+      rollResults: {
+        roll1: attackerRolls[0],
+        roll2: attackerRolls[1],
+        roll3: attackerRolls[2],
+        bestRoll: Math.max(...attackerRolls)
+      },
+      hadMunitions: attacker.resources.munitions > 0,
+      hadGasoline: attacker.resources.gasoline > 0
+    };
+    
     return {
       success: attackerWins >= 2,
       outcome,
@@ -481,6 +542,7 @@ export class BattleSimulationEngine {
       attackerLosses,
       defenderLosses,
       resourcesUsed,
+      battleCalculations,
       rolls: { attacker: attackerRolls, defender: defenderRolls }
     };
   }

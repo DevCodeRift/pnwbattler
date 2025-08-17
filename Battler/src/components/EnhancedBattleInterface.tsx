@@ -477,6 +477,88 @@ export default function EnhancedBattleInterface({ session, currentNationId, time
                       </div>
                     </div>
                     
+                    {/* Detailed Battle Calculations */}
+                    <div className="mt-4 pt-4 border-t border-gray-600">
+                      <h4 className="font-semibold text-cyan-400 mb-3">Battle Calculations</h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <h5 className="font-semibold text-blue-400 mb-2">Attacker Forces</h5>
+                          <div className="space-y-1">
+                            {(battle.battleCalculations.attackerUnitsUsed.soldiers || 0) > 0 && (
+                              <p>👥 {(battle.battleCalculations.attackerUnitsUsed.soldiers || 0).toLocaleString()} soldiers</p>
+                            )}
+                            {(battle.battleCalculations.attackerUnitsUsed.tanks || 0) > 0 && (
+                              <p>🏗️ {(battle.battleCalculations.attackerUnitsUsed.tanks || 0).toLocaleString()} tanks</p>
+                            )}
+                            {(battle.battleCalculations.attackerUnitsUsed.aircraft || 0) > 0 && (
+                              <p>✈️ {(battle.battleCalculations.attackerUnitsUsed.aircraft || 0).toLocaleString()} aircraft</p>
+                            )}
+                            {(battle.battleCalculations.attackerUnitsUsed.ships || 0) > 0 && (
+                              <p>🚢 {(battle.battleCalculations.attackerUnitsUsed.ships || 0).toLocaleString()} ships</p>
+                            )}
+                            <p className="text-cyan-300 font-semibold">
+                              Total Strength: {battle.battleCalculations.attackerStrength.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <h5 className="font-semibold text-red-400 mb-2">Defender Forces</h5>
+                          <div className="space-y-1">
+                            {(battle.battleCalculations.defenderUnitsDefending.soldiers || 0) > 0 && (
+                              <p>👥 {(battle.battleCalculations.defenderUnitsDefending.soldiers || 0).toLocaleString()} soldiers</p>
+                            )}
+                            {(battle.battleCalculations.defenderUnitsDefending.tanks || 0) > 0 && (
+                              <p>🏗️ {(battle.battleCalculations.defenderUnitsDefending.tanks || 0).toLocaleString()} tanks</p>
+                            )}
+                            {(battle.battleCalculations.defenderUnitsDefending.aircraft || 0) > 0 && (
+                              <p>✈️ {(battle.battleCalculations.defenderUnitsDefending.aircraft || 0).toLocaleString()} aircraft</p>
+                            )}
+                            {(battle.battleCalculations.defenderUnitsDefending.ships || 0) > 0 && (
+                              <p>🚢 {(battle.battleCalculations.defenderUnitsDefending.ships || 0).toLocaleString()} ships</p>
+                            )}
+                            <p className="text-cyan-300 font-semibold">
+                              Total Strength: {battle.battleCalculations.defenderStrength.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-purple-400 font-semibold">Strength Ratio:</span>
+                          <span className="text-white">
+                            {battle.battleCalculations.strengthRatio.toFixed(2)}:1 
+                            {battle.battleCalculations.strengthRatio > 1 ? ' (Advantage: Attacker)' : ' (Advantage: Defender)'}
+                          </span>
+                        </div>
+                        
+                        <div className="flex justify-between items-center">
+                          <span className="text-purple-400 font-semibold">Best Battle Roll:</span>
+                          <span className="text-white">{battle.battleCalculations.rollResults.bestRoll.toLocaleString()}</span>
+                        </div>
+                        
+                        <div className="flex justify-between items-center">
+                          <span className="text-purple-400 font-semibold">Resource Bonuses:</span>
+                          <span className="text-white">
+                            {battle.battleCalculations.hadMunitions ? '💥 Munitions' : ''}
+                            {battle.battleCalculations.hadMunitions && battle.battleCalculations.hadGasoline ? ' + ' : ''}
+                            {battle.battleCalculations.hadGasoline ? '⛽ Gasoline' : ''}
+                            {!battle.battleCalculations.hadMunitions && !battle.battleCalculations.hadGasoline ? 'None' : ''}
+                          </span>
+                        </div>
+                        
+                        {battle.attackType === 'ground' && (
+                          <div className="mt-3 p-2 bg-gray-600 rounded">
+                            <p className="text-xs text-gray-300">
+                              <strong>P&W Formula:</strong> Army Value = Soldiers × {battle.battleCalculations.hadMunitions ? '1.75' : '1.0'} + Tanks × {battle.battleCalculations.hadMunitions && battle.battleCalculations.hadGasoline ? '40' : '0'}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
                     {(battle.resourcesUsed.munitions || battle.resourcesUsed.gasoline) && (
                       <div className="mt-3 pt-3 border-t border-gray-600">
                         <h4 className="font-semibold text-purple-400 mb-1">Resources Used</h4>

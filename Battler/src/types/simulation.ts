@@ -185,6 +185,31 @@ export interface BattleHistoryEntry {
     munitions?: number;
     gasoline?: number;
   };
+  battleCalculations: {
+    attackerUnitsUsed: {
+      soldiers?: number;
+      tanks?: number;
+      aircraft?: number;
+      ships?: number;
+    };
+    defenderUnitsDefending: {
+      soldiers?: number;
+      tanks?: number;
+      aircraft?: number;
+      ships?: number;
+    };
+    attackerStrength: number;
+    defenderStrength: number;
+    strengthRatio: number;
+    rollResults: {
+      roll1: number;
+      roll2: number;
+      roll3: number;
+      bestRoll: number;
+    };
+    hadMunitions: boolean;
+    hadGasoline: boolean;
+  };
 }
 
 export interface BattleAction {
