@@ -173,7 +173,7 @@ export default function RealNationBattlePage() {
       social_policy: nationData.social_policy || 'Liberal',
       score: nationData.score || 1000,
       population: nationData.population || 1000000,
-      land: nationData.land || 10000,
+      land: simulatedCities.reduce((sum: number, city: any) => sum + (city.land || 0), 0) || 10000, // Calculate total land from cities
       maps: 6, // Starting MAPs
       maxMaps: 12
     };

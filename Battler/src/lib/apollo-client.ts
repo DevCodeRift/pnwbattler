@@ -47,22 +47,24 @@ export const apolloClient = new ApolloClient({
   },
 });
 
-// GraphQL Queries for Politics and War API
-export const GET_NATION_BY_ID = gql`
-  query GetNation($id: Int!) {
-    nations(id: [$id]) {
+const GET_NATIONS_BY_ID = gql`
+  query GetNationsById($id: [Int]!) {
+    nations(id: $id, first: 1) {
       data {
         id
         nation_name
         leader_name
-        continent
-        color
         alliance_id
         alliance {
           id
           name
         }
+        war_policy
+        domestic_policy
+        color
+        num_cities
         score
+        population
         soldiers
         tanks
         aircraft
@@ -81,10 +83,9 @@ export const GET_NATION_BY_ID = gql`
         steel
         aluminum
         food
-        population
-        land
-        wars_won
-        wars_lost
+        government_type
+        economic_policy
+        social_policy
         cities {
           id
           name
@@ -124,21 +125,24 @@ export const GET_NATION_BY_ID = gql`
   }
 `;
 
-export const GET_NATION_BY_NAME = gql`
-  query GetNationByName($name: String!) {
-    nations(first: 1, nation_name: [$name]) {
+const GET_NATIONS_BY_NAME = gql`
+  query GetNationsByName($name: [String]!) {
+    nations(nation_name: $name, first: 1) {
       data {
         id
         nation_name
         leader_name
-        continent
-        color
         alliance_id
         alliance {
           id
           name
         }
+        war_policy
+        domestic_policy
+        color
+        num_cities
         score
+        population
         soldiers
         tanks
         aircraft
@@ -157,10 +161,9 @@ export const GET_NATION_BY_NAME = gql`
         steel
         aluminum
         food
-        population
-        land
-        wars_won
-        wars_lost
+        government_type
+        economic_policy
+        social_policy
         cities {
           id
           name
@@ -253,3 +256,6 @@ export const SEARCH_NATIONS = gql`
     }
   }
 `;
+
+// Export the renamed queries for backward compatibility
+export { GET_NATIONS_BY_ID as GET_NATION_BY_ID, GET_NATIONS_BY_NAME as GET_NATION_BY_NAME };
