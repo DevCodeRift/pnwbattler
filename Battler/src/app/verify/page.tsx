@@ -14,6 +14,7 @@ export default function VerifyPage() {
   const [foundNation, setFoundNation] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [generatedCode, setGeneratedCode] = useState('');
 
   const searchNation = async () => {
@@ -58,6 +59,7 @@ export default function VerifyPage() {
 
     setLoading(true);
     setError('');
+    setSuccessMessage('');
 
     try {
       const response = await fetch('/api/verify', {
@@ -81,7 +83,15 @@ export default function VerifyPage() {
         setGeneratedCode(data.code);
       }
 
-      setStep('code');
+      // Show success message if we're already on the code step (resending)
+      if (step === 'code') {
+        setSuccessMessage('Verification code resent successfully!');
+        // Clear the success message after 3 seconds
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setStep('code');
+      }
+      
       setError('');
     } catch (err: any) {
       setError(err.message || 'Failed to request verification');
@@ -268,10 +278,19 @@ export default function VerifyPage() {
 
           {step === 'code' && (
             <div className="space-y-6">
+              {successMessage && (
+                <div className="bg-green-900/30 border border-green-600/30 rounded-lg p-4">
+                  <p className="text-green-200 text-sm">{successMessage}</p>
+                </div>
+              )}
+              
               <div className="bg-blue-900/30 border border-blue-600/30 rounded-lg p-4">
                 <h3 className="text-lg font-semibold text-blue-200 mb-2">Verification Code Sent</h3>
                 <p className="text-blue-100 text-sm">
                   A verification code has been sent to your Politics & War inbox. Please enter it below to complete verification.
+                </p>
+                <p className="text-blue-200 text-sm mt-2">
+                  <strong>Tip:</strong> If you don't receive the code, you can click "Resend Code" to get a new one.
                 </p>
                 {generatedCode && (
                   <div className="mt-3 p-3 bg-yellow-900/30 border border-yellow-600/30 rounded">
@@ -303,6 +322,13 @@ export default function VerifyPage() {
                   className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors"
                 >
                   Back
+                </button>
+                <button
+                  onClick={requestVerification}
+                  disabled={loading}
+                  className="bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors"
+                >
+                  {loading ? 'Resending...' : 'Resend Code'}
                 </button>
                 <button
                   onClick={submitVerification}

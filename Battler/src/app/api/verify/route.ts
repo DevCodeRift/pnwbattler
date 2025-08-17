@@ -32,6 +32,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const discordId = (session.user as any).discordId;
+
     // Verify the nation exists in P&W API
     try {
       const { data, errors } = await apolloClient.query({
@@ -46,9 +48,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check if nation is already verified by another user (in production, check database)
+      // Check if nation is already verified by another user (not the current user)
       const existingVerification = Array.from(verificationCodes.values())
-        .find(v => v.nationId === nationId && v.expires > new Date());
+        .find(v => v.nationId === nationId && v.expires > new Date() && v.discordId !== discordId);
       
       if (existingVerification) {
         return NextResponse.json(
@@ -69,8 +71,7 @@ export async function POST(request: NextRequest) {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
     
-    const discordId = (session.user as any).discordId;
-    
+    // Store or update the verification code for this user
     verificationCodes.set(discordId, {
       discordId,
       code,
