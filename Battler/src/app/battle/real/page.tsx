@@ -210,17 +210,27 @@ function RealBattleContent() {
   };
 
   const subscribeToLobbyEvents = (lobbyId: string) => {
-    if (!pusherClient) return;
+    if (!pusherClient) {
+      console.log('No pusher client available for lobby events');
+      return;
+    }
     
+    console.log('Subscribing to lobby events for lobby:', lobbyId);
     const lobbyChannel = pusherClient.subscribe(`lobby-${lobbyId}`);
     
     lobbyChannel.bind('player-joined', (eventData: any) => {
       console.log('Player joined lobby:', eventData);
       setCurrentLobby((prev: any) => {
-        if (prev && prev.id === eventData.lobbyId) {
-          return eventData.lobby || {
+        // If we have the full lobby data, use it
+        if (eventData.lobby) {
+          return eventData.lobby;
+        }
+        // Fallback: update the current lobby if it matches
+        if (prev && (prev.id === eventData.lobbyId || prev.id === lobbyId)) {
+          return {
             ...prev,
-            players: [...prev.players, eventData.player]
+            players: eventData.player ? [...prev.players, eventData.player] : prev.players,
+            playerCount: eventData.player ? prev.playerCount + 1 : prev.playerCount
           };
         }
         return prev;
@@ -230,10 +240,16 @@ function RealBattleContent() {
     lobbyChannel.bind('player-left', (eventData: any) => {
       console.log('Player left lobby:', eventData);
       setCurrentLobby((prev: any) => {
-        if (prev && prev.id === eventData.lobbyId) {
-          return eventData.lobby || {
+        // If we have the full lobby data, use it
+        if (eventData.lobby) {
+          return eventData.lobby;
+        }
+        // Fallback: update the current lobby if it matches
+        if (prev && (prev.id === eventData.lobbyId || prev.id === lobbyId)) {
+          return {
             ...prev,
-            players: prev.players.filter((p: any) => p.id !== eventData.playerId)
+            players: prev.players.filter((p: any) => p.id !== eventData.playerId),
+            playerCount: Math.max(0, prev.playerCount - 1)
           };
         }
         return prev;
@@ -327,7 +343,10 @@ function RealBattleContent() {
 
       const data = await response.json();
       
+      console.log('Join lobby response:', data);
+      
       if (response.ok && data.lobby) {
+        console.log('Setting current lobby to:', data.lobby);
         setCurrentLobby(data.lobby);
         setGameState('lobby');
         
@@ -336,10 +355,13 @@ function RealBattleContent() {
         
         if (data.rejoined) {
           console.log('Successfully rejoined lobby');
+        } else {
+          console.log('Successfully joined new lobby');
         }
         
         await loadActiveGames();
       } else {
+        console.error('Join lobby failed:', data);
         setError(data.error || 'Failed to join lobby');
       }
     } catch (error) {

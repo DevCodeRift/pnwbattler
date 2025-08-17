@@ -179,6 +179,8 @@ export async function POST(request: NextRequest) {
       case 'join-lobby': {
         const { lobbyId, playerName, asSpectator } = data;
         
+        console.log('Join lobby request:', { lobbyId, playerName, asSpectator, discordId });
+        
         const lobby = await prisma.lobby.findUnique({
           where: { id: lobbyId },
           include: {
@@ -197,6 +199,7 @@ export async function POST(request: NextRequest) {
 
         // Check if user is already in this lobby
         const existingPlayer = lobby.players.find((player: any) => player.discordId === discordId);
+        console.log('Existing player check:', { existingPlayer: !!existingPlayer, playerCount: lobby.players.length });
         if (existingPlayer) {
           // User is already in lobby, just return the current state
           const formattedLobby = {
@@ -237,7 +240,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Add as player with Discord ID
-          await prisma.player.create({
+          const newPlayer = await prisma.player.create({
             data: {
               name: playerName || userName,
               discordId: discordId,
@@ -246,6 +249,8 @@ export async function POST(request: NextRequest) {
               isReady: false,
             },
           });
+          
+          console.log('Created new player:', { playerId: newPlayer.id, name: newPlayer.name, discordId: newPlayer.discordId });
         }
 
         // Get updated lobby
@@ -276,14 +281,18 @@ export async function POST(request: NextRequest) {
           }))
         };
 
+        console.log('Formatted lobby before broadcast:', formattedLobby);
+
         // Broadcast lobby update
         await pusher.trigger('multiplayer', 'lobby-updated', formattedLobby);
         await pusher.trigger(`lobby-${lobbyId}`, 'player-joined', {
           playerName,
           asSpectator,
           lobby: formattedLobby,
+          lobbyId: lobbyId,
         });
 
+        console.log('Returning lobby response:', formattedLobby);
         return NextResponse.json({ lobby: formattedLobby });
       }
 
@@ -608,6 +617,7 @@ export async function POST(request: NextRequest) {
           await pusher.trigger(`lobby-${lobbyId}`, 'player-left', {
             playerName,
             lobby: formattedLobby,
+            lobbyId: lobbyId,
           });
         }
 
