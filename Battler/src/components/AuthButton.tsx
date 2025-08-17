@@ -2,20 +2,21 @@
 
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { useAuthStore } from '../stores';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 
 export default function AuthButton() {
   const { data: session, status } = useSession();
   const { login, logout, user } = useAuthStore();
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     if (session?.user && status === 'authenticated') {
       login({
-        id: (session.user as any).discordId,
-        username: (session.user as any).username,
-        discriminator: (session.user as any).discriminator,
-        avatar: (session.user as any).avatar,
+        id: (session.user as any).discordId || '',
+        username: (session.user as any).username || session.user.name || 'User',
+        discriminator: (session.user as any).discriminator || '',
+        avatar: (session.user as any).avatar || '',
         email: session.user.email || undefined,
       });
     } else if (status === 'unauthenticated') {
@@ -33,17 +34,25 @@ export default function AuthButton() {
     return (
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-2">
-          {session.user?.image && (
+          {session.user?.image && !imageError ? (
             <Image
               src={session.user.image}
               alt="Avatar"
               width={32}
               height={32}
               className="w-8 h-8 rounded-full"
+              onError={() => setImageError(true)}
+              unoptimized
             />
+          ) : (
+            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-bold">
+                {((session.user as any)?.username || session.user?.name || 'U').charAt(0).toUpperCase()}
+              </span>
+            </div>
           )}
           <span className="text-white font-medium">
-            {(session.user as any)?.username || session.user?.name}
+            {(session.user as any)?.username || session.user?.name || 'User'}
           </span>
         </div>
         <button

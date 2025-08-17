@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google'
 import Providers from '../components/Providers'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
+import ErrorBoundary from '../components/ErrorBoundary'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -20,17 +21,19 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} bg-gray-900`}>
-        <Providers>
-          <div className="min-h-screen bg-gray-900">
-            <Header />
-            <div className="flex">
-              <Sidebar />
-              <main className="flex-1 min-h-screen bg-gray-800">
-                {children}
-              </main>
+        <ErrorBoundary>
+          <Providers>
+            <div className="min-h-screen bg-gray-900">
+              <Header />
+              <div className="flex">
+                <Sidebar />
+                <main className="flex-1 min-h-screen bg-gray-800">
+                  {children}
+                </main>
+              </div>
             </div>
-          </div>
-        </Providers>
+          </Providers>
+        </ErrorBoundary>
       </body>
     </html>
   )

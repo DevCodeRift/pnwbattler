@@ -63,13 +63,13 @@ export const useBattleStore = create<BattleState>((set, get) => ({
   lastAction: null,
   setBattle: (battle) => set({ currentBattle: battle }),
   addPlayer: (player) => set((state) => ({ 
-    players: [...state.players, player] 
+    players: [...(state.players || []), player] 
   })),
   removePlayer: (playerId) => set((state) => ({
-    players: state.players.filter(p => p.id !== playerId)
+    players: (state.players || []).filter(p => p.id !== playerId)
   })),
   updatePlayer: (playerId, updates) => set((state) => ({
-    players: state.players.map(p => 
+    players: (state.players || []).map(p => 
       p.id === playerId ? { ...p, ...updates } : p
     )
   })),
