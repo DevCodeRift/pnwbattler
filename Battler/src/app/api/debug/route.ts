@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
         data {
           id
           nation_name
+          leader_name
         }
       }
     }`;

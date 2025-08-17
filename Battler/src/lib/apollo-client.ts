@@ -45,36 +45,11 @@ export const GET_NATION_BY_ID = gql`
         continent
         color
         alliance_id
-        alliance {
-          id
-          name
-          acronym
-          color
-        }
-        cities {
-          id
-          name
-          infrastructure
-          land
-          powered
-        }
         score
-        population
-        land
         soldiers
         tanks
         aircraft
         ships
-        missiles
-        nukes
-        money
-        wars_won
-        wars_lost
-        war_policy
-        domestic_policy
-        government_type
-        economic_policy
-        social_policy
       }
     }
   }
@@ -90,36 +65,11 @@ export const GET_NATION_BY_NAME = gql`
         continent
         color
         alliance_id
-        alliance {
-          id
-          name
-          acronym
-          color
-        }
-        cities {
-          id
-          name
-          infrastructure
-          land
-          powered
-        }
         score
-        population
-        land
         soldiers
         tanks
         aircraft
         ships
-        missiles
-        nukes
-        money
-        wars_won
-        wars_lost
-        war_policy
-        domestic_policy
-        government_type
-        economic_policy
-        social_policy
       }
     }
   }
