@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import Pusher from 'pusher-js';
+import MultiplayerBattleInterface from '../../../components/MultiplayerBattleInterface';
 
 // Multiplayer Settings Interface
 interface MultiplayerSettings {
@@ -919,30 +920,14 @@ function RealBattleContent() {
         )}
 
         {gameState === 'battle' && currentBattle && (
-          <div>
-            <h1 className="text-3xl font-bold mb-8">Battle in Progress</h1>
-            <div className="bg-gray-800 rounded-lg p-6">
-              <p className="text-green-400 text-xl mb-4">Battle Started Successfully!</p>
-              <p className="text-gray-300 mb-4">Battle ID: {currentBattle.id}</p>
-              <p className="text-gray-300 mb-4">Players: {currentBattle.playerCount}</p>
-              <p className="text-gray-300 mb-4">Status: {currentBattle.status}</p>
-              <p className="text-gray-300 mb-6">The battle interface would be loaded here with real-time updates.</p>
-              
-              <div className="bg-gray-700 rounded p-4 mb-4">
-                <h3 className="text-lg font-semibold mb-2">Debug Info:</h3>
-                <pre className="text-sm text-gray-300 overflow-auto">
-                  {JSON.stringify(currentBattle, null, 2)}
-                </pre>
-              </div>
-              
-              <button
-                onClick={() => setGameState('setup')}
-                className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-semibold"
-              >
-                Back to Lobby List
-              </button>
-            </div>
-          </div>
+          <MultiplayerBattleInterface
+            battle={currentBattle}
+            lobby={currentLobby}
+            onBattleAction={async (action: any) => {
+              console.log('Battle action executed:', action);
+              // Handle battle action result
+            }}
+          />
         )}
 
         {gameState === 'battle' && !currentBattle && (
