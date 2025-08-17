@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
         query: GET_NATION_BY_ID,
         variables: { id: nationId },
       });
-      return NextResponse.json({ nation: data.nation });
+      const nations = data.nations?.data || [];
+      return NextResponse.json({ nation: nations[0] || null });
     } else if (nationName) {
       const { data } = await apolloClient.query({
         query: GET_NATION_BY_NAME,
@@ -53,7 +54,8 @@ export async function POST(request: NextRequest) {
             query: GET_NATION_BY_ID,
             variables: { id },
           });
-          return data.nation;
+          const nations = data.nations?.data || [];
+          return nations[0] || null;
         } catch (error) {
           console.error(`Error fetching nation ${id}:`, error);
           return null;

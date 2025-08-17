@@ -1,25 +1,22 @@
 import { ApolloClient, InMemoryCache, createHttpLink, gql } from '@apollo/client';
-import { setContext } from '@apollo/client/link/context';
+
+// Get the API key from environment variables
+// Use server-side env var for API routes, client-side for client components
+const getApiKey = () => {
+  return typeof window === 'undefined' 
+    ? process.env.PW_API_KEY || process.env.NEXT_PUBLIC_PW_API_KEY
+    : process.env.NEXT_PUBLIC_PW_API_KEY;
+};
 
 const httpLink = createHttpLink({
-  uri: 'https://api.politicsandwar.com/graphql',
-});
-
-const authLink = setContext((_, { headers }) => {
-  // Get the API key from environment variables
-  const apiKey = process.env.NEXT_PUBLIC_PW_API_KEY;
-  
-  return {
-    headers: {
-      ...headers,
-      'X-API-KEY': apiKey || '',
-      'Content-Type': 'application/json',
-    }
-  };
+  uri: () => {
+    const apiKey = getApiKey();
+    return `https://api.politicsandwar.com/graphql${apiKey ? `?api_key=${apiKey}` : ''}`;
+  },
 });
 
 export const apolloClient = new ApolloClient({
-  link: authLink.concat(httpLink),
+  link: httpLink,
   cache: new InMemoryCache(),
   defaultOptions: {
     watchQuery: {
@@ -34,43 +31,45 @@ export const apolloClient = new ApolloClient({
 // GraphQL Queries for Politics and War API
 export const GET_NATION_BY_ID = gql`
   query GetNation($id: ID!) {
-    nation(id: $id) {
-      id
-      nation_name
-      leader_name
-      continent
-      color
-      alliance_id
-      alliance {
+    nations(id: [$id]) {
+      data {
         id
-        name
-        acronym
+        nation_name
+        leader_name
+        continent
         color
-      }
-      cities {
-        id
-        name
-        infrastructure
+        alliance_id
+        alliance {
+          id
+          name
+          acronym
+          color
+        }
+        cities {
+          id
+          name
+          infrastructure
+          land
+          powered
+        }
+        score
+        population
         land
-        powered
+        soldiers
+        tanks
+        aircraft
+        ships
+        missiles
+        nukes
+        money
+        wars_won
+        wars_lost
+        war_policy
+        domestic_policy
+        government_type
+        economic_policy
+        social_policy
       }
-      score
-      population
-      land
-      soldiers
-      tanks
-      aircraft
-      ships
-      missiles
-      nukes
-      money
-      wars_won
-      wars_lost
-      war_policy
-      domestic_policy
-      government_type
-      economic_policy
-      social_policy
     }
   }
 `;
@@ -122,20 +121,22 @@ export const GET_NATION_BY_NAME = gql`
 
 export const GET_ALLIANCE_BY_ID = gql`
   query GetAlliance($id: ID!) {
-    alliance(id: $id) {
-      id
-      name
-      acronym
-      color
-      score
-      applicants
-      members
-      accepted_members
-      nations {
+    alliances(id: [$id]) {
+      data {
         id
-        nation_name
-        leader_name
+        name
+        acronym
+        color
         score
+        applicants
+        members
+        accepted_members
+        nations {
+          id
+          nation_name
+          leader_name
+          score
+        }
       }
     }
   }
