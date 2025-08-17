@@ -11,6 +11,7 @@ export default function RealNationBattlePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [timeRemaining, setTimeRemaining] = useState(30);
+  const [isMockMode, setIsMockMode] = useState(false);
 
   // Timer effect
   useEffect(() => {
@@ -52,6 +53,12 @@ export default function RealNationBattlePage() {
       if (!result.nation) {
         console.error('No nation data in response:', result);
         throw new Error('No nation data found in response');
+      }
+
+      // Check if this is mock data and store the info
+      if (result._mock) {
+        console.log('Using mock data:', result._message);
+        setIsMockMode(true);
       }
 
       return result.nation; // Extract the nation from the response
@@ -343,6 +350,18 @@ export default function RealNationBattlePage() {
     <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
       <div className="bg-gray-800 rounded-lg p-8 max-w-md w-full">
         <h1 className="text-2xl font-bold mb-6 text-center">Real Nation Battle Simulator</h1>
+        
+        {isMockMode && (
+          <div className="mb-6 p-4 bg-yellow-900/50 border border-yellow-600 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <span className="text-yellow-400">⚠️</span>
+              <span className="text-yellow-200 font-medium">Demo Mode</span>
+            </div>
+            <p className="text-yellow-100 text-sm mt-1">
+              Using sample nation data for demonstration. Available test nations: 145633, 662952, 701263
+            </p>
+          </div>
+        )}
         
         {error && (
           <div className="bg-red-600 text-white p-3 rounded mb-4">
