@@ -4,14 +4,20 @@ import { ApolloClient, InMemoryCache, createHttpLink, gql } from '@apollo/client
 // Use server-side env var for API routes, client-side for client components
 const getApiKey = () => {
   return typeof window === 'undefined' 
-    ? process.env.PW_API_KEY || process.env.NEXT_PUBLIC_PW_API_KEY
+    ? process.env.NEXT_PUBLIC_PW_API_KEY || process.env.PW_BOT_API_KEY
     : process.env.NEXT_PUBLIC_PW_API_KEY;
 };
 
 const httpLink = createHttpLink({
   uri: () => {
     const apiKey = getApiKey();
-    return `https://api.politicsandwar.com/graphql${apiKey ? `?api_key=${apiKey}` : ''}`;
+    if (!apiKey) {
+      console.error('No API key found in environment variables');
+      return 'https://api.politicsandwar.com/graphql';
+    }
+    const fullUri = `https://api.politicsandwar.com/graphql?api_key=${apiKey}`;
+    console.log('Using GraphQL endpoint with API key configured');
+    return fullUri;
   },
 });
 

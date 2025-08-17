@@ -29,8 +29,27 @@ export async function GET(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error fetching nation:', error);
+    
+    // Log more detailed error information
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
+    
+    // Check if it's a GraphQL error
+    if (error && typeof error === 'object' && 'graphQLErrors' in error) {
+      console.error('GraphQL errors:', (error as any).graphQLErrors);
+    }
+    
+    if (error && typeof error === 'object' && 'networkError' in error) {
+      console.error('Network error:', (error as any).networkError);
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to fetch nation data' },
+      { 
+        error: 'Failed to fetch nation data',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
