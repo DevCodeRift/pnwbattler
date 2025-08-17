@@ -920,14 +920,29 @@ function RealBattleContent() {
         )}
 
         {gameState === 'battle' && currentBattle && (
-          <MultiplayerBattleInterface
-            battle={currentBattle}
-            lobby={currentLobby}
-            onBattleAction={async (action: any) => {
-              console.log('Battle action executed:', action);
-              // Handle battle action result
-            }}
-          />
+          <div>
+            <div className="bg-gray-800 rounded-lg p-4 mb-4 text-sm">
+              <h3 className="text-white font-semibold mb-2">Debug Info:</h3>
+              <p className="text-gray-300">Current Battle: {currentBattle ? '✅' : '❌'}</p>
+              <p className="text-gray-300">Current Lobby: {currentLobby ? '✅' : '❌'}</p>
+              {currentLobby && (
+                <div className="text-gray-400 text-xs mt-2">
+                  <p>Lobby ID: {currentLobby.id}</p>
+                  <p>Players: {currentLobby.players ? currentLobby.players.length : 'undefined'}</p>
+                  <p>Settings: {currentLobby.settings ? 'present' : 'missing'}</p>
+                </div>
+              )}
+            </div>
+            
+            <MultiplayerBattleInterface
+              battle={currentBattle}
+              lobby={currentLobby}
+              onBattleAction={async (action: any) => {
+                console.log('Battle action executed:', action);
+                // Handle battle action result
+              }}
+            />
+          </div>
         )}
 
         {gameState === 'battle' && !currentBattle && (
