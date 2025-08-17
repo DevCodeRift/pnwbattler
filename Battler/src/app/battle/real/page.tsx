@@ -937,9 +937,49 @@ function RealBattleContent() {
             <MultiplayerBattleInterface
               battle={currentBattle}
               lobby={currentLobby}
+              session={session}
               onBattleAction={async (action: any) => {
                 console.log('Battle action executed:', action);
-                // Handle battle action result
+                
+                try {
+                  setLoading(true);
+                  
+                  const response = await fetch('/api/multiplayer', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      action: 'battle-action',
+                      battleId: action.battleId,
+                      battleAction: action.action,
+                      details: action.details,
+                      timestamp: action.timestamp
+                    }),
+                  });
+
+                  if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Battle action failed');
+                  }
+
+                  const result = await response.json();
+                  console.log('Battle action result:', result);
+                  
+                  // Update local battle state if needed
+                  if (result.gameState) {
+                    setBattle((prev: any) => ({
+                      ...prev,
+                      gameState: result.gameState
+                    }));
+                  }
+                  
+                } catch (error) {
+                  console.error('Error executing battle action:', error);
+                  setError(error instanceof Error ? error.message : 'Battle action failed');
+                } finally {
+                  setLoading(false);
+                }
               }}
             />
           </div>
