@@ -200,39 +200,61 @@ export class BattleSimulationEngine {
    * Execute an attack action
    */
   private executeAttack(session: BattleSession, attacker: SimulatedNation, action: any): boolean {
-    const attackData = action as AttackAction;
-    const mapCost = this.getAttackCost(attackData.type);
+    console.log('Executing attack:', { attackerMaps: attacker.maps, action });
+    
+    const attackType = action.attackType;
+    const targetId = action.target;
+    
+    // Convert string to AttackType enum
+    let attackTypeEnum: AttackType;
+    switch (attackType) {
+      case 'ground':
+        attackTypeEnum = AttackType.GROUND;
+        break;
+      case 'air':
+        attackTypeEnum = AttackType.AIR;
+        break;
+      case 'naval':
+        attackTypeEnum = AttackType.NAVAL;
+        break;
+      default:
+        console.log('Invalid attack type:', attackType);
+        return false;
+    }
+    
+    const mapCost = this.getAttackCost(attackTypeEnum);
+    console.log('Attack cost:', mapCost, 'Available maps:', attacker.maps);
     
     // Check if attacker has enough MAPs
     if (!this.deductMaps(attacker, mapCost)) {
+      console.log('Not enough MAPs for attack');
       return false;
     }
 
-    const target = session.participants.find(p => p.id === attackData.target);
+    const target = session.participants.find(p => p.id === targetId);
     if (!target) {
+      console.log('Target not found:', targetId);
       return false;
     }
 
     // Calculate attack results
-    const attackerStrength = this.calculateMilitaryStrength(attacker, attackData.type);
-    const defenderStrength = this.calculateMilitaryStrength(target, attackData.type);
+    const attackerStrength = this.calculateMilitaryStrength(attacker, attackTypeEnum);
+    const defenderStrength = this.calculateMilitaryStrength(target, attackTypeEnum);
+    
+    console.log('Battle strength:', { attacker: attackerStrength, defender: defenderStrength });
     
     const success = attackerStrength > defenderStrength * Math.random();
     const damage = success ? Math.floor(defenderStrength * 0.1) : 0;
 
+    console.log('Attack result:', { success, damage });
+
     // Apply damage to target
     if (success && damage > 0) {
-      this.applyMilitaryDamage(target, attackData.type, damage);
+      this.applyMilitaryDamage(target, attackTypeEnum, damage);
     }
 
-    // Store attack result
-    attackData.result = {
-      success,
-      damage,
-      losses: {} // TODO: Calculate attacker losses
-    };
-
     session.updated_at = new Date().toISOString();
+    console.log('Attack completed, remaining MAPs:', attacker.maps);
     return true;
   }
 

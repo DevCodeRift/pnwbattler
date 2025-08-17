@@ -72,7 +72,7 @@ export default function BattleInterface({ session, currentNationId, timeRemainin
   const handleAttack = (attackType: string) => {
     const action = {
       type: 'attack',
-      attackType,
+      attackType: attackType,
       target: enemy.id
     };
     onExecuteAction(action);

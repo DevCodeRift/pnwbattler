@@ -161,7 +161,11 @@ async function handleGetOpenLobbies() {
 async function handleExecuteAction(data: any) {
   const { sessionId, nationId, battleAction } = data;
   
+  console.log('API: Executing action:', { sessionId, nationId, battleAction });
+  
   const success = battleEngine.executeBattleAction(sessionId, nationId, battleAction);
+  
+  console.log('API: Action result:', success);
   
   if (!success) {
     return NextResponse.json({ error: 'Failed to execute action' }, { status: 400 });
