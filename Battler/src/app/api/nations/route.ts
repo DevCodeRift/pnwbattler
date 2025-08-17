@@ -39,70 +39,207 @@ export async function GET(request: NextRequest) {
     // Continue with real API calls if API key is configured
     if (nationId) {
       console.log('Fetching nation by ID:', nationId);
-      const { data } = await apolloClient.query({
-        query: GET_NATION_BY_ID,
-        variables: { id: parseInt(nationId, 10) },
-      });
       
-      console.log('GraphQL response data:', JSON.stringify(data, null, 2));
-      
-      // Check different possible response structures
-      let nations = null;
-      if (data?.nations?.data) {
-        nations = data.nations.data;
-      } else if (data?.nations) {
-        nations = data.nations;
-      } else if (data?.data?.nations) {
-        nations = data.data.nations;
-      } else {
-        console.error('Unexpected response structure:', data);
+      try {
+        const result = await apolloClient.query({
+          query: GET_NATION_BY_ID,
+          variables: { id: parseInt(nationId, 10) },
+          fetchPolicy: 'network-only',
+        });
+        
+        console.log('GraphQL result object:', result);
+        console.log('GraphQL data:', JSON.stringify(result.data, null, 2));
+        console.log('GraphQL errors:', result.errors);
+        console.log('GraphQL loading:', result.loading);
+        console.log('GraphQL network status:', result.networkStatus);
+        
+        // Check for GraphQL errors first
+        if (result.errors && result.errors.length > 0) {
+          console.error('GraphQL query returned errors:', result.errors);
+          return NextResponse.json(
+            { 
+              error: 'GraphQL query failed',
+              details: result.errors.map((err: any) => err.message).join(', '),
+              graphqlErrors: result.errors
+            },
+            { status: 500 }
+          );
+        }
+        
+        // Check if we have any data at all
+        if (!result.data) {
+          console.error('No data in GraphQL result');
+          return NextResponse.json(
+            { 
+              error: 'No data returned from GraphQL query',
+              details: 'GraphQL query completed but returned no data',
+              fullResult: result
+            },
+            { status: 500 }
+          );
+        }
+        
+        // Log the exact structure we received
+        console.log('Data structure keys:', Object.keys(result.data));
+        if (result.data.nations) {
+          console.log('Nations structure:', typeof result.data.nations);
+          console.log('Nations keys:', Object.keys(result.data.nations || {}));
+          if (result.data.nations.data) {
+            console.log('Nations data length:', result.data.nations.data.length);
+            console.log('First nation preview:', result.data.nations.data[0] ? Object.keys(result.data.nations.data[0]) : 'No nations');
+          }
+        }
+        
+        // Try to extract nation data with better error handling
+        let nations = null;
+        if (result.data?.nations?.data) {
+          nations = result.data.nations.data;
+          console.log('Found nations in data.nations.data:', nations.length);
+        } else if (result.data?.nations) {
+          nations = result.data.nations;
+          console.log('Found nations in data.nations:', Array.isArray(nations) ? nations.length : 'not array');
+        } else {
+          console.error('Nations not found in expected locations');
+          console.error('Available data keys:', Object.keys(result.data));
+          return NextResponse.json(
+            { 
+              error: 'Unexpected API response structure',
+              details: 'Nations data not found in expected location',
+              responseStructure: Object.keys(result.data),
+              fullData: result.data
+            },
+            { status: 500 }
+          );
+        }
+        
+        const nation = Array.isArray(nations) ? nations[0] : nations;
+        
+        if (!nation) {
+          console.log('No nation found in nations array/object');
+          return NextResponse.json(
+            { 
+              error: 'Nation not found',
+              details: `No nation found with ID ${nationId}`,
+              nationsFound: Array.isArray(nations) ? nations.length : 'not array'
+            },
+            { status: 404 }
+          );
+        }
+        
+        console.log('Successfully extracted nation:', nation.id, nation.nation_name);
+        return NextResponse.json({ nation });
+        
+      } catch (queryError) {
+        console.error('GraphQL query failed with error:', queryError);
+        
+        // Log detailed error information
+        if (queryError instanceof Error) {
+          console.error('Error message:', queryError.message);
+          console.error('Error stack:', queryError.stack);
+        }
+        
+        // Check if it's an Apollo/GraphQL specific error
+        if (queryError && typeof queryError === 'object') {
+          if ('graphQLErrors' in queryError) {
+            console.error('GraphQL errors:', (queryError as any).graphQLErrors);
+          }
+          if ('networkError' in queryError) {
+            console.error('Network error:', (queryError as any).networkError);
+          }
+          if ('extraInfo' in queryError) {
+            console.error('Extra info:', (queryError as any).extraInfo);
+          }
+        }
+        
         return NextResponse.json(
           { 
-            error: 'Unexpected API response structure',
-            details: 'Nations data not found in expected location',
-            responseStructure: Object.keys(data || {})
+            error: 'GraphQL query execution failed',
+            details: queryError instanceof Error ? queryError.message : 'Unknown GraphQL error',
+            errorType: queryError?.constructor?.name || 'Unknown'
           },
           { status: 500 }
         );
       }
-      
-      const nation = Array.isArray(nations) ? nations[0] : nations;
-      console.log('Extracted nation:', nation);
-      
-      return NextResponse.json({ nation: nation || null });
     } else if (nationName) {
       console.log('Fetching nation by name:', nationName);
-      const { data } = await apolloClient.query({
-        query: GET_NATION_BY_NAME,
-        variables: { name: nationName },
-      });
       
-      console.log('GraphQL response data:', JSON.stringify(data, null, 2));
-      
-      // Check different possible response structures
-      let nations = null;
-      if (data?.nations?.data) {
-        nations = data.nations.data;
-      } else if (data?.nations) {
-        nations = data.nations;
-      } else if (data?.data?.nations) {
-        nations = data.data.nations;
-      } else {
-        console.error('Unexpected response structure:', data);
+      try {
+        const result = await apolloClient.query({
+          query: GET_NATION_BY_NAME,
+          variables: { name: nationName },
+          fetchPolicy: 'network-only',
+        });
+        
+        console.log('GraphQL result for name query:', result);
+        console.log('GraphQL data for name:', JSON.stringify(result.data, null, 2));
+        
+        // Check for GraphQL errors first
+        if (result.errors && result.errors.length > 0) {
+          console.error('GraphQL name query returned errors:', result.errors);
+          return NextResponse.json(
+            { 
+              error: 'GraphQL name query failed',
+              details: result.errors.map((err: any) => err.message).join(', '),
+              graphqlErrors: result.errors
+            },
+            { status: 500 }
+          );
+        }
+        
+        if (!result.data) {
+          console.error('No data in GraphQL name result');
+          return NextResponse.json(
+            { 
+              error: 'No data returned from GraphQL name query',
+              details: 'GraphQL query completed but returned no data'
+            },
+            { status: 500 }
+          );
+        }
+        
+        let nations = null;
+        if (result.data?.nations?.data) {
+          nations = result.data.nations.data;
+        } else if (result.data?.nations) {
+          nations = result.data.nations;
+        } else {
+          console.error('Nations not found in name query response');
+          return NextResponse.json(
+            { 
+              error: 'Unexpected API response structure for name query',
+              details: 'Nations data not found in expected location',
+              responseStructure: Object.keys(result.data),
+              fullData: result.data
+            },
+            { status: 500 }
+          );
+        }
+        
+        const nation = Array.isArray(nations) ? nations[0] : nations;
+        
+        if (!nation) {
+          return NextResponse.json(
+            { 
+              error: 'Nation not found',
+              details: `No nation found with name ${nationName}`
+            },
+            { status: 404 }
+          );
+        }
+        
+        console.log('Successfully extracted nation by name:', nation.id, nation.nation_name);
+        return NextResponse.json({ nation });
+        
+      } catch (queryError) {
+        console.error('GraphQL name query failed with error:', queryError);
         return NextResponse.json(
           { 
-            error: 'Unexpected API response structure',
-            details: 'Nations data not found in expected location',
-            responseStructure: Object.keys(data || {})
+            error: 'GraphQL name query execution failed',
+            details: queryError instanceof Error ? queryError.message : 'Unknown GraphQL error'
           },
           { status: 500 }
         );
       }
-      
-      const nation = Array.isArray(nations) ? nations[0] : nations;
-      console.log('Extracted nation:', nation);
-      
-      return NextResponse.json({ nation: nation || null });
     } else {
       return NextResponse.json(
         { error: 'Nation ID or name is required' },

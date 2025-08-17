@@ -294,9 +294,22 @@ export function getMockNationData(nationId: string) {
 }
 
 export function isApiKeyConfigured(): boolean {
-  const apiKey = typeof window === 'undefined' 
-    ? process.env.NEXT_PUBLIC_PW_API_KEY || process.env.PW_BOT_API_KEY
-    : process.env.NEXT_PUBLIC_PW_API_KEY;
+  const serverKey = process.env.PW_BOT_API_KEY;
+  const publicKey = process.env.NEXT_PUBLIC_PW_API_KEY;
   
-  return !!(apiKey && apiKey !== 'your_pw_api_key_here' && apiKey.length > 10);
+  const apiKey = typeof window === 'undefined' 
+    ? serverKey || publicKey
+    : publicKey;
+  
+  const isConfigured = !!(apiKey && apiKey !== 'your_pw_api_key_here' && apiKey.length > 10);
+  
+  console.log('Mock data check:', {
+    isServer: typeof window === 'undefined',
+    hasServerKey: !!serverKey,
+    hasPublicKey: !!publicKey,
+    apiKeyConfigured: isConfigured,
+    keyPreview: apiKey ? `${apiKey.substring(0, 6)}...` : 'none'
+  });
+  
+  return isConfigured;
 }
