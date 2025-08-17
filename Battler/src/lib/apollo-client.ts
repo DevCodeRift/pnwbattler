@@ -15,8 +15,16 @@ const getApiKey = () => {
     hasServerKey: !!serverKey,
     hasPublicKey: !!publicKey,
     usingKey: apiKey ? `${apiKey.substring(0, 6)}...` : 'none',
-    keyLength: apiKey?.length || 0
+    keyLength: apiKey?.length || 0,
+    nodeEnv: process.env.NODE_ENV
   });
+  
+  if (!apiKey) {
+    console.error('CRITICAL: No API key found! Available env vars:', {
+      PW_BOT_API_KEY: process.env.PW_BOT_API_KEY ? 'set' : 'not set',
+      NEXT_PUBLIC_PW_API_KEY: process.env.NEXT_PUBLIC_PW_API_KEY ? 'set' : 'not set'
+    });
+  }
   
   return apiKey;
 };
@@ -26,12 +34,25 @@ const httpLink = createHttpLink({
     const apiKey = getApiKey();
     if (!apiKey) {
       console.error('No API key found in environment variables');
-      return 'https://api.politicsandwar.com/graphql';
+      throw new Error('Politics & War API key not configured');
     }
     const fullUri = `https://api.politicsandwar.com/graphql?api_key=${apiKey}`;
     console.log('GraphQL URI configured with API key');
     return fullUri;
   },
+  fetch: (uri, options) => {
+    console.log('Making GraphQL request to:', uri);
+    return fetch(uri, options).then(response => {
+      console.log('GraphQL response status:', response.status);
+      if (!response.ok) {
+        console.error('GraphQL HTTP error:', response.status, response.statusText);
+      }
+      return response;
+    }).catch(error => {
+      console.error('GraphQL fetch error:', error);
+      throw error;
+    });
+  }
 });
 
 export const apolloClient = new ApolloClient({

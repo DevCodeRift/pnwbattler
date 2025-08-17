@@ -15,9 +15,13 @@ const verificationCodes = new Map<string, {
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('GET /api/verify - Starting verification check');
+    
     const session = await getServerSession(authOptions);
+    console.log('GET /api/verify - Session:', session ? 'exists' : 'null');
     
     if (!session?.user) {
+      console.log('GET /api/verify - No session or user');
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -25,8 +29,10 @@ export async function GET(request: NextRequest) {
     }
 
     const discordId = (session.user as any).discordId;
+    console.log('GET /api/verify - Discord ID:', discordId);
     
     if (!discordId) {
+      console.log('GET /api/verify - No Discord ID in session');
       return NextResponse.json(
         { error: 'Discord ID not found in session' },
         { status: 400 }
@@ -34,17 +40,21 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is verified in database
+    console.log('GET /api/verify - Checking database for user:', discordId);
     const user = await prisma.user.findUnique({
       where: { discordId },
     });
+    console.log('GET /api/verify - User found:', user ? 'yes' : 'no');
     
     if (user && user.isVerified && user.pwNationData) {
+      console.log('GET /api/verify - User is verified');
       return NextResponse.json({
         verified: true,
         nation: user.pwNationData,
         verifiedAt: user.verifiedAt,
       });
     } else {
+      console.log('GET /api/verify - User not verified');
       return NextResponse.json({
         verified: false,
       });
@@ -52,8 +62,9 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Error checking verification status:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
-      { error: 'Failed to check verification status' },
+      { error: 'Failed to check verification status', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
@@ -61,7 +72,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('POST /api/verify - Starting verification request');
+    
     const session = await getServerSession(authOptions);
+    console.log('POST /api/verify - Session exists:', !!session?.user);
     
     if (!session?.user) {
       return NextResponse.json(
@@ -71,6 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { nationId } = await request.json();
+    console.log('POST /api/verify - Nation ID received:', nationId);
     
     if (!nationId) {
       return NextResponse.json(
@@ -91,13 +106,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the nation exists in P&W API
+    console.log('POST /api/verify - Checking nation with GraphQL API');
     try {
       const { data, errors } = await apolloClient.query({
         query: GET_NATION_BY_ID,
         variables: { id: parseInt(nationId) },
       });
 
+      console.log('POST /api/verify - GraphQL response errors:', errors);
+      console.log('POST /api/verify - GraphQL response data:', data ? 'exists' : 'null');
+      console.log('POST /api/verify - Nation data:', data?.nations?.data?.[0] ? 'found' : 'not found');
+
       if (errors || !data.nations?.data?.[0]) {
+        console.error('POST /api/verify - Nation not found or GraphQL errors:', errors);
         return NextResponse.json(
           { error: 'Nation not found in Politics and War' },
           { status: 404 }
@@ -117,8 +138,9 @@ export async function POST(request: NextRequest) {
 
     } catch (error) {
       console.error('Error fetching nation from P&W API:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       return NextResponse.json(
-        { error: 'Failed to verify nation with Politics and War API' },
+        { error: 'Failed to verify nation with Politics and War API', details: error instanceof Error ? error.message : 'Unknown error' },
         { status: 500 }
       );
     }
@@ -190,8 +212,9 @@ This code will expire in 30 minutes. If you did not request this verification, p
     });
   } catch (error) {
     console.error('Error generating verification code:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
-      { error: 'Failed to generate verification code' },
+      { error: 'Failed to generate verification code', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
@@ -303,16 +326,18 @@ export async function PUT(request: NextRequest) {
 
     } catch (error) {
       console.error('Error fetching nation data during verification:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       return NextResponse.json(
-        { error: 'Failed to fetch nation data' },
+        { error: 'Failed to fetch nation data', details: error instanceof Error ? error.message : 'Unknown error' },
         { status: 500 }
       );
     }
 
   } catch (error) {
     console.error('Error verifying code:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
-      { error: 'Failed to verify code' },
+      { error: 'Failed to verify code', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
