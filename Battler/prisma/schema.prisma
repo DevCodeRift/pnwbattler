@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,18 +8,17 @@ datasource db {
 }
 
 model Lobby {
-  id          String   @id @default(cuid())
-  host        String
-  hostName    String
-  settings    Json
-  status      LobbyStatus @default(WAITING)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  players     Player[]
-  spectators  Spectator[]
-  battle      Battle?
-  
+  id         String      @id @default(cuid())
+  host       String
+  hostName   String
+  settings   Json
+  status     LobbyStatus @default(WAITING)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  battle     Battle?
+  players    Player[]
+  spectators Spectator[]
+
   @@map("lobbies")
 }
 
@@ -35,9 +28,8 @@ model Player {
   isHost    Boolean  @default(false)
   lobbyId   String
   createdAt DateTime @default(now())
-  
   lobby     Lobby    @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
-  
+
   @@map("players")
 }
 
@@ -47,39 +39,36 @@ model Spectator {
   lobbyId   String?
   battleId  String?
   createdAt DateTime @default(now())
-  
-  lobby     Lobby?   @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
   battle    Battle?  @relation(fields: [battleId], references: [id], onDelete: Cascade)
-  
+  lobby     Lobby?   @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
+
   @@map("spectators")
 }
 
 model Battle {
-  id          String   @id @default(cuid())
-  lobbyId     String   @unique
-  gameState   Json
-  status      BattleStatus @default(IN_PROGRESS)
-  startedAt   DateTime @default(now())
-  endedAt     DateTime?
-  
-  lobby       Lobby    @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
-  spectators  Spectator[]
-  actions     BattleAction[]
-  
+  id         String         @id @default(cuid())
+  lobbyId    String         @unique
+  gameState  Json
+  status     BattleStatus   @default(IN_PROGRESS)
+  startedAt  DateTime       @default(now())
+  endedAt    DateTime?
+  actions    BattleAction[]
+  lobby      Lobby          @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
+  spectators Spectator[]
+
   @@map("battles")
 }
 
 model BattleAction {
-  id          String   @id @default(cuid())
-  battleId    String
-  playerId    String
-  actionType  String
-  actionData  Json
-  turn        Int
-  timestamp   DateTime @default(now())
-  
-  battle      Battle   @relation(fields: [battleId], references: [id], onDelete: Cascade)
-  
+  id         String   @id @default(cuid())
+  battleId   String
+  playerId   String
+  actionType String
+  actionData Json
+  turn       Int
+  timestamp  DateTime @default(now())
+  battle     Battle   @relation(fields: [battleId], references: [id], onDelete: Cascade)
+
   @@map("battle_actions")
 }
 

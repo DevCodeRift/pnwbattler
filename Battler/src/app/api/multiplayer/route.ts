@@ -17,6 +17,16 @@ export async function GET(request: NextRequest) {
     const action = searchParams.get('action');
 
     if (action === 'active-games') {
+      // Check if database is available
+      if (!process.env.DATABASE_URL) {
+        console.error('DATABASE_URL not configured');
+        return NextResponse.json({ 
+          lobbies: [], 
+          battles: [],
+          error: 'Database not configured' 
+        });
+      }
+
       // Get active lobbies and battles
       const lobbies = await prisma.lobby.findMany({
         where: {
@@ -77,7 +87,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
     console.error('GET /api/multiplayer error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    
+    // Return empty data instead of 500 error for frontend compatibility
+    return NextResponse.json({ 
+      lobbies: [], 
+      battles: [],
+      error: error instanceof Error ? error.message : 'Database connection failed'
+    });
   }
 }
 
@@ -407,6 +423,16 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('POST /api/multiplayer error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    
+    // Return specific error information for debugging
+    let errorMessage = 'Internal server error';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    
+    return NextResponse.json({ 
+      error: errorMessage,
+      success: false 
+    }, { status: 500 });
   }
 }
