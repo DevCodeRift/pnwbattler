@@ -46,12 +46,15 @@ export default function HomePage() {
       setIsConnected(false);
     };
 
-    const handleActiveGames = (data: { lobbies: Lobby[]; battles: Battle[] }) => {
-      setActiveLobbies(data.lobbies);
-      setActiveBattles(data.battles);
+    const handleActiveGames = (data: { lobbies?: Lobby[]; battles?: Battle[] }) => {
+      const lobbies = data?.lobbies || [];
+      const battles = data?.battles || [];
+      
+      setActiveLobbies(lobbies);
+      setActiveBattles(battles);
       setOnlineCount(
-        data.lobbies.reduce((acc, lobby) => acc + lobby.playerCount + lobby.spectatorCount, 0) +
-        data.battles.reduce((acc, battle) => acc + battle.playerCount + battle.spectatorCount, 0)
+        lobbies.reduce((acc, lobby) => acc + lobby.playerCount + lobby.spectatorCount, 0) +
+        battles.reduce((acc, battle) => acc + battle.playerCount + battle.spectatorCount, 0)
       );
     };
 

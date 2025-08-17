@@ -17,7 +17,7 @@ class VercelMultiplayerManager {
     });
 
     // Subscribe to global events
-    const globalChannel = this.pusher.subscribe('global');
+    const globalChannel = this.pusher.subscribe('multiplayer');
     
     globalChannel.bind('lobby-created', (data: any) => {
       this.emit('lobby-created', data);
@@ -25,6 +25,10 @@ class VercelMultiplayerManager {
     
     globalChannel.bind('lobby-updated', (data: any) => {
       this.emit('lobby-updated', data);
+    });
+    
+    globalChannel.bind('lobby-closed', (data: any) => {
+      this.emit('lobby-closed', data);
     });
     
     globalChannel.bind('battle-created', (data: any) => {
@@ -57,23 +61,25 @@ class VercelMultiplayerManager {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'create-lobby',
-          data: {
-            playerId: this.currentPlayerId,
-            playerName,
-            settings
-          }
+          hostName: playerName,
+          settings
         })
       });
       
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const result = await response.json();
-      if (result.success) {
+      if (result.lobby) {
         // Subscribe to lobby-specific events
         this.subscribeToLobby(result.lobby.id);
         this.emit('lobby-joined', { lobby: result.lobby, role: 'host' });
       } else {
-        this.emit('error', { message: result.error });
+        this.emit('error', { message: result.error || 'Failed to create lobby' });
       }
     } catch (error) {
+      console.error('Failed to create lobby:', error);
       this.emit('error', { message: 'Failed to create lobby' });
     }
   }
@@ -85,26 +91,28 @@ class VercelMultiplayerManager {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'join-lobby',
-          data: {
-            lobbyId,
-            playerId: this.currentPlayerId,
-            playerName,
-            asSpectator
-          }
+          lobbyId,
+          playerName,
+          asSpectator
         })
       });
       
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const result = await response.json();
-      if (result.success) {
+      if (result.lobby) {
         this.subscribeToLobby(lobbyId);
         this.emit('lobby-joined', { 
           lobby: result.lobby, 
           role: asSpectator ? 'spectator' : 'player' 
         });
       } else {
-        this.emit('error', { message: result.error });
+        this.emit('error', { message: result.error || 'Failed to join lobby' });
       }
     } catch (error) {
+      console.error('Failed to join lobby:', error);
       this.emit('error', { message: 'Failed to join lobby' });
     }
   }
@@ -159,10 +167,16 @@ class VercelMultiplayerManager {
   // Get active games
   async getActiveGames() {
     try {
-      const response = await fetch('/api/multiplayer');
+      const response = await fetch('/api/multiplayer?action=active-games');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       const data = await response.json();
       this.emit('active-games', data);
     } catch (error) {
+      console.error('Failed to get active games:', error);
+      // Emit empty data as fallback
+      this.emit('active-games', { lobbies: [], battles: [] });
       this.emit('error', { message: 'Failed to get active games' });
     }
   }
