@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { useAuthStore } from '../../stores';
 
 export default function ManualVerifyPage() {
   const { data: session } = useSession();
+  const { setPWNation, setVerified, isVerified, pwNation } = useAuthStore();
   const [nationId, setNationId] = useState('');
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -32,6 +34,12 @@ export default function ManualVerifyPage() {
 
       if (response.ok) {
         setResult(data);
+        
+        // Update the Zustand store with verification status and nation data
+        if (data.nation && data.verified) {
+          setPWNation(data.nation);
+          setVerified(true);
+        }
       } else {
         setError(data.error || 'Manual verification failed');
       }
@@ -85,6 +93,45 @@ export default function ManualVerifyPage() {
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-6">Manual Verification (Admin)</h1>
         
+        {/* Current Status */}
+        <div className="bg-gray-800 rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Current Status</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <span className="text-gray-400">Verification Status:</span>{' '}
+              <span className={`font-medium ${isVerified ? 'text-green-400' : 'text-yellow-400'}`}>
+                {isVerified ? '✅ Verified' : '⏳ Not Verified'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400">Nation Linked:</span>{' '}
+              <span className={`font-medium ${pwNation ? 'text-green-400' : 'text-red-400'}`}>
+                {pwNation ? `✅ ${pwNation.nation_name}` : '❌ None'}
+              </span>
+            </div>
+          </div>
+          
+          {isVerified && pwNation && (
+            <div className="mt-4 bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <span className="text-green-400">🎉</span>
+                <span className="text-green-200 font-medium">Account Already Verified!</span>
+              </div>
+              <p className="text-green-100 text-sm mt-1">
+                Your account is already verified and linked to {pwNation.nation_name}. You can now access all features.
+              </p>
+              <div className="mt-3">
+                <a
+                  href="/"
+                  className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors"
+                >
+                  Go to Dashboard
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="bg-gray-800 rounded-lg p-6 mb-6">
           <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2">
@@ -141,6 +188,26 @@ export default function ManualVerifyPage() {
                 <span className="text-green-200 font-medium">Success</span>
               </div>
               <p className="text-green-100 text-sm mt-1">{result.message}</p>
+              
+              <div className="mt-4 bg-green-800/40 rounded-lg p-3">
+                <p className="text-green-100 text-sm mb-3">
+                  🎉 <strong>Verification Complete!</strong> Your account is now verified and linked to your P&W nation.
+                </p>
+                <div className="flex gap-3">
+                  <a
+                    href="/"
+                    className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors"
+                  >
+                    Go to Dashboard
+                  </a>
+                  <a
+                    href="/verify"
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors"
+                  >
+                    View Verification Status
+                  </a>
+                </div>
+              </div>
               
               {result.nation && (
                 <div className="mt-4 bg-gray-700 rounded-lg p-4">
