@@ -342,3 +342,58 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    console.log('DELETE /api/verify - Starting verification cancellation');
+    
+    const session = await getServerSession(authOptions);
+    console.log('DELETE /api/verify - Session exists:', !!session?.user);
+    
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const discordId = (session.user as any).discordId;
+    console.log('DELETE verification - discordId:', discordId);
+    
+    if (!discordId) {
+      return NextResponse.json(
+        { error: 'Discord ID not found in session' },
+        { status: 400 }
+      );
+    }
+
+    // Check if there's a verification in progress
+    const verification = verificationCodes.get(discordId);
+    
+    if (!verification) {
+      console.log('DELETE verification - No verification found for discordId:', discordId);
+      return NextResponse.json(
+        { error: 'No verification in progress to cancel' },
+        { status: 404 }
+      );
+    }
+
+    // Remove the verification code
+    verificationCodes.delete(discordId);
+    console.log('DELETE verification - Verification cancelled for discordId:', discordId);
+    console.log('DELETE verification - verificationCodes size:', verificationCodes.size);
+
+    return NextResponse.json({
+      message: 'Verification cancelled successfully',
+      cancelled: true,
+    });
+
+  } catch (error) {
+    console.error('Error cancelling verification:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    return NextResponse.json(
+      { error: 'Failed to cancel verification', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}

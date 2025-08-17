@@ -154,6 +154,37 @@ export default function VerifyPage() {
     }
   };
 
+  const cancelVerification = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/verify', {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to cancel verification');
+      }
+
+      // Reset to search step
+      setStep('search');
+      setVerificationCode('');
+      setFoundNation(null);
+      setGeneratedCode('');
+      setSuccessMessage('Verification cancelled successfully');
+      
+      // Clear the success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to cancel verification');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!session) {
     return (
       <div className="p-6">
@@ -341,6 +372,13 @@ export default function VerifyPage() {
                   className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors"
                 >
                   Back
+                </button>
+                <button
+                  onClick={cancelVerification}
+                  disabled={loading}
+                  className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors"
+                >
+                  {loading ? 'Cancelling...' : 'Cancel'}
                 </button>
                 <button
                   onClick={requestVerification}
