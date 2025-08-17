@@ -145,6 +145,11 @@ export interface SimulatedNation {
   land: number;
   maps: number; // Military Action Points - starts at 6, gains 1 per turn
   maxMaps: number; // Maximum MAPs (usually 12)
+  resistance: number; // Resistance points (starts at 100)
+  battleEffects: {
+    groundControl: boolean; // IT on Ground Attack - allows killing aircraft on subsequent ground attacks
+    airSuperiority: boolean; // IT on Air Strike - halves enemy tank effectiveness
+  };
 }
 
 export interface BattleSession {
@@ -225,6 +230,14 @@ export interface BattleAction {
 export interface AttackAction {
   type: AttackType;
   target: string;
+  unitsUsed?: {
+    soldiers?: number;
+    tanks?: number;
+    aircraft?: number;
+    ships?: number;
+  };
+  useMunitions?: boolean;
+  airstrikeTarget?: 'aircraft' | 'soldiers' | 'tanks' | 'money' | 'infrastructure';
   result?: {
     success: boolean;
     damage: number;

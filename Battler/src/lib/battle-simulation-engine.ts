@@ -43,7 +43,12 @@ export class BattleSimulationEngine {
       population: 0,
       land: 0,
       maps: MAP_CONSTANTS.STARTING_MAPS,
-      maxMaps: MAP_CONSTANTS.MAX_MAPS
+      maxMaps: MAP_CONSTANTS.MAX_MAPS,
+      resistance: 100,
+      battleEffects: {
+        groundControl: false,
+        airSuperiority: false
+      }
     };
 
     const session: BattleSession = {
@@ -88,7 +93,12 @@ export class BattleSimulationEngine {
       population: 0,
       land: 0,
       maps: MAP_CONSTANTS.STARTING_MAPS,
-      maxMaps: MAP_CONSTANTS.MAX_MAPS
+      maxMaps: MAP_CONSTANTS.MAX_MAPS,
+      resistance: 100,
+      battleEffects: {
+        groundControl: false,
+        airSuperiority: false
+      }
     };
 
     session.participants.push(participant);

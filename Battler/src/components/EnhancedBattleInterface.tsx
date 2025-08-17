@@ -15,6 +15,14 @@ export default function EnhancedBattleInterface({ session, currentNationId, time
   const [battleOdds, setBattleOdds] = useState({ IT: 0, MS: 0, PV: 0, UF: 0 });
   const [lastBattleResult, setLastBattleResult] = useState<any>(null);
   const [showTimeline, setShowTimeline] = useState(false);
+  const [showBattlePlan, setShowBattlePlan] = useState(false);
+  const [battlePlan, setBattlePlan] = useState({
+    soldiersUsed: 0,
+    tanksUsed: 0,
+    aircraftUsed: 0,
+    useMunitions: true,
+    airstrikeTarget: 'soldiers' as 'aircraft' | 'soldiers' | 'tanks' | 'money' | 'infrastructure'
+  });
 
   const currentNation = session.participants.find(p => p.id === currentNationId);
   const enemy = session.participants.find(p => p.id !== currentNationId);
@@ -104,20 +112,77 @@ export default function EnhancedBattleInterface({ session, currentNationId, time
 
   const handleActionSelect = (actionType: string) => {
     setSelectedAction(actionType);
+    
+    // Set default battle plan values based on action type
+    if (actionType === 'ground') {
+      setBattlePlan(prev => ({
+        ...prev,
+        soldiersUsed: currentNation ? Math.floor(currentNation.military.soldiers * 0.5) : 0,
+        tanksUsed: currentNation ? Math.floor(currentNation.military.tanks * 0.5) : 0,
+        aircraftUsed: 0
+      }));
+    } else if (actionType === 'air') {
+      setBattlePlan(prev => ({
+        ...prev,
+        soldiersUsed: 0,
+        tanksUsed: 0,
+        aircraftUsed: currentNation ? Math.floor(currentNation.military.aircraft * 0.5) : 0
+      }));
+    } else if (actionType === 'naval') {
+      setBattlePlan(prev => ({
+        ...prev,
+        soldiersUsed: 0,
+        tanksUsed: 0,
+        aircraftUsed: 0
+      }));
+    }
   };
 
   const executeAction = () => {
     if (!selectedAction) return;
     
     if (selectedAction === 'ground' || selectedAction === 'air' || selectedAction === 'naval') {
+      // Show battle planning modal for tactical choices
+      setShowBattlePlan(true);
+    } else {
+      // Execute other actions immediately
       const action = {
-        type: 'attack',
-        attackType: selectedAction,
+        type: selectedAction,
         target: enemy.id
       };
       onExecuteAction(action);
+      setSelectedAction('');
     }
+  };
+
+  const executePlannedBattle = () => {
+    if (!selectedAction) return;
+    
+    const action = {
+      type: 'attack',
+      attackType: selectedAction,
+      target: enemy.id,
+      unitsUsed: {
+        soldiers: battlePlan.soldiersUsed,
+        tanks: battlePlan.tanksUsed,
+        aircraft: battlePlan.aircraftUsed
+      },
+      useMunitions: battlePlan.useMunitions,
+      airstrikeTarget: selectedAction === 'air' ? battlePlan.airstrikeTarget : undefined
+    };
+    
+    onExecuteAction(action);
     setSelectedAction('');
+    setShowBattlePlan(false);
+    
+    // Reset battle plan
+    setBattlePlan({
+      soldiersUsed: 0,
+      tanksUsed: 0,
+      aircraftUsed: 0,
+      useMunitions: true,
+      airstrikeTarget: 'soldiers'
+    });
   };
 
   return (
@@ -397,6 +462,199 @@ export default function EnhancedBattleInterface({ session, currentNationId, time
           </div>
         </div>
       </div>
+
+      {/* Battle Planning Modal */}
+      {showBattlePlan && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">
+                Plan Your {selectedAction.charAt(0).toUpperCase() + selectedAction.slice(1)} Attack
+              </h2>
+              <button 
+                onClick={() => setShowBattlePlan(false)}
+                className="text-gray-400 hover:text-white text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-6">
+              {selectedAction === 'ground' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Soldiers to Deploy (Available: {currentNation?.military.soldiers.toLocaleString()})
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max={currentNation?.military.soldiers || 0}
+                      value={battlePlan.soldiersUsed}
+                      onChange={(e) => setBattlePlan(prev => ({ ...prev, soldiersUsed: parseInt(e.target.value) }))}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-sm text-gray-400">
+                      <span>0</span>
+                      <span className="font-bold text-white">
+                        {battlePlan.soldiersUsed.toLocaleString()} soldiers
+                      </span>
+                      <span>{currentNation?.military.soldiers.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Tanks to Deploy (Available: {currentNation?.military.tanks.toLocaleString()})
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max={currentNation?.military.tanks || 0}
+                      value={battlePlan.tanksUsed}
+                      onChange={(e) => setBattlePlan(prev => ({ ...prev, tanksUsed: parseInt(e.target.value) }))}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-sm text-gray-400">
+                      <span>0</span>
+                      <span className="font-bold text-white">
+                        {battlePlan.tanksUsed.toLocaleString()} tanks
+                      </span>
+                      <span>{currentNation?.military.tanks.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={battlePlan.useMunitions}
+                        onChange={(e) => setBattlePlan(prev => ({ ...prev, useMunitions: e.target.checked }))}
+                        className="rounded"
+                      />
+                      <span>Use Munitions (Soldier effectiveness: {battlePlan.useMunitions ? '1.75x' : '1.0x'})</span>
+                    </label>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Available: {currentNation?.resources.munitions.toLocaleString()} munitions
+                      {battlePlan.useMunitions && battlePlan.soldiersUsed > 0 && (
+                        <span className="text-yellow-400 block">
+                          Will consume: {Math.ceil(battlePlan.soldiersUsed / 5000).toLocaleString()} munitions
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {selectedAction === 'air' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Aircraft to Deploy (Available: {currentNation?.military.aircraft.toLocaleString()})
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max={currentNation?.military.aircraft || 0}
+                      value={battlePlan.aircraftUsed}
+                      onChange={(e) => setBattlePlan(prev => ({ ...prev, aircraftUsed: parseInt(e.target.value) }))}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-sm text-gray-400">
+                      <span>0</span>
+                      <span className="font-bold text-white">
+                        {battlePlan.aircraftUsed.toLocaleString()} aircraft
+                      </span>
+                      <span>{currentNation?.military.aircraft.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Airstrike Target</label>
+                    <select 
+                      value={battlePlan.airstrikeTarget}
+                      onChange={(e) => setBattlePlan(prev => ({ ...prev, airstrikeTarget: e.target.value as any }))}
+                      className="w-full bg-gray-700 border border-gray-600 rounded p-2"
+                    >
+                      <option value="aircraft">Enemy Aircraft</option>
+                      <option value="soldiers">Enemy Soldiers</option>
+                      <option value="tanks">Enemy Tanks</option>
+                      <option value="money">Money/Economy</option>
+                      <option value="infrastructure">Infrastructure</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {/* Battle Preview */}
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h4 className="font-bold text-lg mb-2">Battle Preview</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>MAP Cost:</span>
+                    <span className="font-bold">{getMapCost(selectedAction)}</span>
+                  </div>
+                  {selectedAction === 'ground' && (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Army Strength:</span>
+                        <span className="font-bold">
+                          {(
+                            battlePlan.soldiersUsed * (battlePlan.useMunitions ? 1.75 : 1.0) +
+                            battlePlan.tanksUsed * (battlePlan.useMunitions && (currentNation?.resources.gasoline || 0) > 0 ? 40 : 0)
+                          ).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="text-gray-400">
+                        • Soldiers: {battlePlan.soldiersUsed.toLocaleString()} × {battlePlan.useMunitions ? '1.75' : '1.0'} = {(battlePlan.soldiersUsed * (battlePlan.useMunitions ? 1.75 : 1.0)).toLocaleString()}
+                      </div>
+                      <div className="text-gray-400">
+                        • Tanks: {battlePlan.tanksUsed.toLocaleString()} × {battlePlan.useMunitions && (currentNation?.resources.gasoline || 0) > 0 ? '40' : '0'} = {(battlePlan.tanksUsed * (battlePlan.useMunitions && (currentNation?.resources.gasoline || 0) > 0 ? 40 : 0)).toLocaleString()}
+                      </div>
+                    </>
+                  )}
+                  {selectedAction === 'air' && (
+                    <div className="flex justify-between">
+                      <span>Air Strength:</span>
+                      <span className="font-bold">
+                        {(battlePlan.aircraftUsed * ((currentNation?.resources.munitions || 0) > 0 && (currentNation?.resources.gasoline || 0) > 0 ? 200 : 20)).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex space-x-4">
+                <button
+                  onClick={executePlannedBattle}
+                  disabled={
+                    (selectedAction === 'ground' && battlePlan.soldiersUsed === 0 && battlePlan.tanksUsed === 0) ||
+                    (selectedAction === 'air' && battlePlan.aircraftUsed === 0) ||
+                    !canPerformAction(selectedAction)
+                  }
+                  className={`flex-1 px-6 py-2 rounded font-medium ${
+                    canPerformAction(selectedAction) && (
+                      (selectedAction === 'ground' && (battlePlan.soldiersUsed > 0 || battlePlan.tanksUsed > 0)) ||
+                      (selectedAction === 'air' && battlePlan.aircraftUsed > 0) ||
+                      selectedAction === 'naval'
+                    )
+                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  Execute Attack
+                </button>
+                <button
+                  onClick={() => setShowBattlePlan(false)}
+                  className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* War Timeline Modal */}
       {showTimeline && (
