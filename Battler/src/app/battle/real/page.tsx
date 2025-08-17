@@ -106,9 +106,23 @@ function RealBattleContent() {
       }
     }, 60000); // Update presence every minute
 
+    // Set up periodic lobby cleanup (less frequent)
+    const cleanupInterval = setInterval(() => {
+      // Trigger cleanup via API call every 2 minutes
+      fetch('/api/lobby-cleanup', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+          if (data.details?.cleanedLobbies > 0) {
+            console.log(`Cleaned up ${data.details.cleanedLobbies} inactive lobbies`);
+          }
+        })
+        .catch(error => console.error('Cleanup failed:', error));
+    }, 120000); // Cleanup every 2 minutes
+
     return () => {
       clearInterval(interval);
       clearInterval(heartbeatInterval);
+      clearInterval(cleanupInterval);
       pusher.unsubscribe('multiplayer');
       pusher.disconnect();
     };

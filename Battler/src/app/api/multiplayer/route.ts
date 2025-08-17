@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Pusher from 'pusher';
 import { prisma } from '../../../lib/prisma';
+import { cleanupInactiveLobbies, updateLobbyActivity } from '../../../lib/lobby-cleanup';
 
 // Initialize Pusher
 const pusher = new Pusher({
@@ -25,6 +26,17 @@ export async function GET(request: NextRequest) {
           battles: [],
           error: 'Database not configured' 
         });
+      }
+
+      // Run periodic cleanup of inactive lobbies
+      try {
+        const cleanupResult = await cleanupInactiveLobbies();
+        if (cleanupResult.cleaned > 0) {
+          console.log(`Automatically cleaned up ${cleanupResult.cleaned} inactive lobbies`);
+        }
+      } catch (error) {
+        console.error('Error during automatic lobby cleanup:', error);
+        // Don't fail the request if cleanup fails
       }
 
       // Get active lobbies and battles
@@ -200,6 +212,9 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        // Update lobby activity to prevent it from being cleaned up
+        await updateLobbyActivity(lobbyId);
+
         const formattedLobby = {
           id: updatedLobby!.id,
           hostName: updatedLobby!.hostName,
@@ -239,6 +254,9 @@ export async function POST(request: NextRequest) {
         if (lobby.players.length < 2) {
           return NextResponse.json({ error: 'Need 2 players to start battle' }, { status: 400 });
         }
+
+        // Update lobby activity before starting battle
+        await updateLobbyActivity(lobbyId);
 
         // Update lobby status
         await prisma.lobby.update({
@@ -398,6 +416,9 @@ export async function POST(request: NextRequest) {
 
           await pusher.trigger('multiplayer', 'lobby-closed', { lobbyId });
         } else if (lobby) {
+          // Update lobby activity since there was player movement
+          await updateLobbyActivity(lobbyId);
+          
           const formattedLobby = {
             id: lobby.id,
             hostName: lobby.hostName,
