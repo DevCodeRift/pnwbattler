@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../stores';
 
 export default function LoginPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const { isVerified } = useAuthStore();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -22,9 +22,18 @@ export default function LoginPage() {
   ], []);
 
   useEffect(() => {
+    // Don't redirect during loading
+    if (status === 'loading') return;
+    
     // Redirect if already authenticated and verified
     if (session && isVerified) {
       router.push('/dashboard');
+      return;
+    }
+    
+    // Redirect to verify page if authenticated but not verified
+    if (session && !isVerified) {
+      router.push('/verify');
       return;
     }
 
@@ -58,12 +67,14 @@ export default function LoginPage() {
 
     const interval = setInterval(typeText, isDeleting ? 50 : 100);
     return () => clearInterval(interval);
-  }, [session, isVerified, router, matrixTexts]);
+  }, [session, status, isVerified, router, matrixTexts]);
 
   const handleDiscordLogin = async () => {
     setLoading(true);
     try {
-      await signIn('discord', { callbackUrl: '/verify' });
+      await signIn('discord', { 
+        callbackUrl: `${window.location.origin}/verify`
+      });
     } catch (error) {
       console.error('Login failed:', error);
       setLoading(false);
@@ -232,10 +243,10 @@ export default function LoginPage() {
                 {/* Login button */}
                 <button
                   onClick={handleDiscordLogin}
-                  disabled={loading}
+                  disabled={loading || status === 'loading'}
                   className="w-full py-3 px-6 neon-button font-mono font-bold text-base rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? (
+                  {loading || status === 'loading' ? (
                     <div className="flex items-center justify-center space-x-2">
                       <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin"></div>
                       <span>CONNECTING...</span>
@@ -244,6 +255,15 @@ export default function LoginPage() {
                     '► AUTHENTICATE VIA DISCORD'
                   )}
                 </button>
+
+                {/* Debug info - remove in production */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="text-xs text-green-300 border border-green-400 border-opacity-30 rounded p-2 mt-2">
+                    <div>Status: {status}</div>
+                    <div>Session: {session ? 'Yes' : 'No'}</div>
+                    <div>Verified: {isVerified ? 'Yes' : 'No'}</div>
+                  </div>
+                )}
 
                 {/* Security notice - Made more compact */}
                 <div className="text-green-300 font-mono text-xs border-t border-green-400 border-opacity-30 pt-2">
