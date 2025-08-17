@@ -1,0 +1,351 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import EnhancedBattleInterface from '@/components/EnhancedBattleInterface';
+import { BattleSession, SimulatedNation, EconomyMode, MilitarizationLevel } from '@/types/simulation';
+
+export default function RealNationBattlePage() {
+  const [battleSession, setBattleSession] = useState<BattleSession | null>(null);
+  const [attackingNationId, setAttackingNationId] = useState('');
+  const [defendingNationId, setDefendingNationId] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [timeRemaining, setTimeRemaining] = useState(30);
+
+  // Timer effect
+  useEffect(() => {
+    if (!battleSession || timeRemaining <= 0) return;
+
+    const timer = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          advanceTurn();
+          return 30; // Reset timer
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [battleSession, timeRemaining]);
+
+  const fetchNationData = async (nationId: string) => {
+    try {
+      const response = await fetch(`/api/nations?id=${nationId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch nation data');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching nation data:', error);
+      throw error;
+    }
+  };
+
+  const convertToSimulatedNation = (nationData: any, nationalId: string): SimulatedNation => {
+    // Convert P&W nation data to our SimulatedNation format
+    const cities = nationData.cities || [];
+    const simulatedCities = cities.map((city: any) => ({
+      id: city.id || Math.random().toString(),
+      name: city.name || 'Unknown City',
+      infrastructure: city.infrastructure || 1000,
+      land: city.land || 500,
+      powered: city.powered || true,
+      // Military buildings
+      barracks: city.barracks || 0,
+      factory: city.factory || 0,
+      hangar: city.hangar || 0,
+      drydock: city.drydock || 0,
+      // Infrastructure
+      coal_power: city.coal_power || 0,
+      oil_power: city.oil_power || 0,
+      nuclear_power: city.nuclear_power || 0,
+      wind_power: city.wind_power || 0,
+      // Resource buildings
+      coal_mine: city.coal_mine || 0,
+      oil_well: city.oil_well || 0,
+      uranium_mine: city.uranium_mine || 0,
+      iron_mine: city.iron_mine || 0,
+      bauxite_mine: city.bauxite_mine || 0,
+      lead_mine: city.lead_mine || 0,
+      farm: city.farm || 0,
+      // Manufacturing
+      aluminum_refinery: city.aluminum_refinery || 0,
+      steel_mill: city.steel_mill || 0,
+      oil_refinery: city.oil_refinery || 0,
+      munitions_factory: city.munitions_factory || 0,
+      // Civil
+      police_station: city.police_station || 0,
+      hospital: city.hospital || 0,
+      recycling_center: city.recycling_center || 0,
+      subway: city.subway || 0,
+      // Commerce
+      supermarket: city.supermarket || 0,
+      bank: city.bank || 0,
+      shopping_mall: city.shopping_mall || 0,
+      stadium: city.stadium || 0
+    }));
+
+    // If no cities, create a default city
+    if (simulatedCities.length === 0) {
+      simulatedCities.push({
+        id: '1',
+        name: 'Capital',
+        infrastructure: 1000,
+        land: 500,
+        powered: true,
+        barracks: 0, factory: 0, hangar: 0, drydock: 0,
+        coal_power: 0, oil_power: 0, nuclear_power: 0, wind_power: 0,
+        coal_mine: 0, oil_well: 0, uranium_mine: 0, iron_mine: 0,
+        bauxite_mine: 0, lead_mine: 0, farm: 0,
+        aluminum_refinery: 0, steel_mill: 0, oil_refinery: 0, munitions_factory: 0,
+        police_station: 0, hospital: 0, recycling_center: 0, subway: 0,
+        supermarket: 0, bank: 0, shopping_mall: 0, stadium: 0
+      });
+    }
+
+    return {
+      id: nationData.id?.toString() || nationalId,
+      nation_name: nationData.nation_name || `Nation ${nationalId}`,
+      leader_name: nationData.leader_name || 'Unknown Leader',
+      cities: simulatedCities,
+      military: {
+        barracks: simulatedCities.reduce((sum: number, city: any) => sum + city.barracks, 0),
+        factories: simulatedCities.reduce((sum: number, city: any) => sum + city.factory, 0),
+        hangars: simulatedCities.reduce((sum: number, city: any) => sum + city.hangar, 0),
+        drydocks: simulatedCities.reduce((sum: number, city: any) => sum + city.drydock, 0),
+        soldiers: nationData.soldiers || 0,
+        tanks: nationData.tanks || 0,
+        aircraft: nationData.aircraft || 0,
+        ships: nationData.ships || 0,
+        missiles: nationData.missiles || 0,
+        nukes: nationData.nukes || 0
+      },
+      resources: {
+        money: nationData.money || 1000000,
+        oil: nationData.oil || 1000,
+        food: nationData.food || 1000,
+        steel: nationData.steel || 1000,
+        aluminum: nationData.aluminum || 1000,
+        gasoline: nationData.gasoline || 1000,
+        munitions: nationData.munitions || 1000,
+        uranium: nationData.uranium || 100,
+        coal: nationData.coal || 1000,
+        iron: nationData.iron || 1000,
+        bauxite: nationData.bauxite || 1000,
+        lead: nationData.lead || 1000
+      },
+      war_policy: nationData.war_policy || 'Attrition',
+      domestic_policy: nationData.domestic_policy || 'Manifest Destiny',
+      government_type: nationData.government_type || 'Democracy',
+      economic_policy: nationData.economic_policy || 'Capitalism',
+      social_policy: nationData.social_policy || 'Liberal',
+      score: nationData.score || 1000,
+      population: nationData.population || 1000000,
+      land: nationData.land || 10000,
+      maps: 6, // Starting MAPs
+      maxMaps: 12
+    };
+  };
+
+  const createBattleSession = async () => {
+    if (!attackingNationId || !defendingNationId) {
+      setError('Please enter both nation IDs');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Fetch both nations' data
+      console.log('Fetching nation data for:', { attackingNationId, defendingNationId });
+      
+      const [attackerData, defenderData] = await Promise.all([
+        fetchNationData(attackingNationId),
+        fetchNationData(defendingNationId)
+      ]);
+
+      console.log('Received nation data:', { attackerData, defenderData });
+
+      // Convert to our format
+      const attacker = convertToSimulatedNation(attackerData, attackingNationId);
+      const defender = convertToSimulatedNation(defenderData, defendingNationId);
+
+      // Create battle session
+      const newSession: BattleSession = {
+        id: `battle_${Date.now()}`,
+        mode: 'ai' as any,
+        participants: [attacker, defender],
+        currentTurn: 1,
+        turnTimer: 30,
+        isActive: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        settings: {
+          battleMode: 'ai' as any,
+          turnCooldown: 30,
+          turnsUntilRecruitment: 1,
+          militarizationLevel: MilitarizationLevel.CUSTOM,
+          economySettings: {
+            mode: EconomyMode.UNLIMITED,
+            resources: {
+              money: 999999999,
+              oil: 999999999,
+              food: 999999999,
+              steel: 999999999,
+              aluminum: 999999999,
+              gasoline: 999999999,
+              munitions: 999999999,
+              uranium: 999999999,
+              coal: 999999999,
+              iron: 999999999,
+              bauxite: 999999999,
+              lead: 999999999
+            }
+          },
+          spyOperationsEnabled: false,
+          isPrivate: false
+        }
+      };
+
+      setBattleSession(newSession);
+      setTimeRemaining(30);
+    } catch (error: any) {
+      setError(`Error creating battle: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExecuteAction = async (action: any) => {
+    if (!battleSession) return;
+
+    try {
+      const response = await fetch('/api/battle-simulation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'execute_action',
+          sessionId: battleSession.id,
+          nationId: attackingNationId,
+          actionData: action
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.session) {
+          setBattleSession(result.session);
+        }
+      }
+    } catch (error) {
+      console.error('Error executing action:', error);
+    }
+  };
+
+  const advanceTurn = async () => {
+    if (!battleSession) return;
+
+    try {
+      const response = await fetch('/api/battle-simulation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'process_turn',
+          sessionId: battleSession.id
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.session) {
+          setBattleSession(result.session);
+        }
+      }
+    } catch (error) {
+      console.error('Error advancing turn:', error);
+    }
+  };
+
+  if (battleSession) {
+    return (
+      <EnhancedBattleInterface
+        session={battleSession}
+        currentNationId={attackingNationId}
+        timeRemaining={timeRemaining}
+        onExecuteAction={handleExecuteAction}
+      />
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+      <div className="bg-gray-800 rounded-lg p-8 max-w-md w-full">
+        <h1 className="text-2xl font-bold mb-6 text-center">Real Nation Battle Simulator</h1>
+        
+        {error && (
+          <div className="bg-red-600 text-white p-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Attacking Nation ID
+            </label>
+            <input
+              type="text"
+              value={attackingNationId}
+              onChange={(e) => setAttackingNationId(e.target.value)}
+              placeholder="Enter nation ID (e.g., 123456)"
+              className="w-full bg-gray-700 border border-gray-600 rounded p-3 text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Defending Nation ID
+            </label>
+            <input
+              type="text"
+              value={defendingNationId}
+              onChange={(e) => setDefendingNationId(e.target.value)}
+              placeholder="Enter nation ID (e.g., 789012)"
+              className="w-full bg-gray-700 border border-gray-600 rounded p-3 text-white"
+            />
+          </div>
+
+          <button
+            onClick={createBattleSession}
+            disabled={loading || !attackingNationId || !defendingNationId}
+            className={`w-full py-3 rounded font-medium ${
+              loading || !attackingNationId || !defendingNationId
+                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
+          >
+            {loading ? 'Creating Battle...' : 'Start Battle Simulation'}
+          </button>
+        </div>
+
+        <div className="mt-6 text-sm text-gray-400">
+          <p className="mb-2">
+            <strong>Note:</strong> This will fetch real nation data from Politics & War
+          </p>
+          <ul className="list-disc list-inside space-y-1">
+            <li>Military units (soldiers, tanks, aircraft, ships)</li>
+            <li>City builds (barracks, factories, hangars, drydocks)</li>
+            <li>Resources (money, munitions, gasoline, etc.)</li>
+            <li>Nation policies and stats</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}

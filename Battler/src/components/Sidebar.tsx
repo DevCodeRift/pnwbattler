@@ -13,6 +13,7 @@ export default function Sidebar() {
     { name: 'Home', href: '/', icon: '🏠', category: 'main' },
     { name: 'Quick Battle', href: '/battle/quick', icon: '⚔️', category: 'battle' },
     { name: 'Create Match', href: '/battle/create', icon: '🛠️', category: 'battle' },
+    { name: 'Real Nation Battle', href: '/battle/real', icon: '🌍', category: 'battle' },
     { name: 'Join Match', href: '/battle/join', icon: '🎯', category: 'battle' },
     { name: 'My Battles', href: '/battles', icon: '📊', category: 'battle' },
     { name: 'Nation Setup', href: '/nation', icon: '🏛️', category: 'nation', requiresAuth: true },
