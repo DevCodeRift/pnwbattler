@@ -72,6 +72,17 @@ model BattleAction {
   @@map("battle_actions")
 }
 
+model OnlineUser {
+  id         String   @id @default(cuid())
+  discordId  String   @unique
+  username   String
+  avatar     String?
+  lastSeen   DateTime @default(now())
+  isOnline   Boolean  @default(true)
+
+  @@map("online_users")
+}
+
 enum LobbyStatus {
   WAITING
   IN_PROGRESS

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
+import Pusher from 'pusher-js';
 
 // Multiplayer Settings Interface
 interface MultiplayerSettings {
@@ -19,6 +20,13 @@ interface MultiplayerSettings {
   };
 }
 
+interface OnlineUser {
+  id: string;
+  username: string;
+  avatar?: string;
+  lastSeen: string;
+}
+
 function RealBattleContent() {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
@@ -27,8 +35,10 @@ function RealBattleContent() {
   const [currentBattle, setBattle] = useState<any>(null);
   const [lobbies, setLobbies] = useState<any[]>([]);
   const [battles, setBattles] = useState<any[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [pusherClient, setPusherClient] = useState<Pusher | null>(null);
 
   // Form state for creating lobby
   const [hostName, setHostName] = useState(session?.user?.name || '');
@@ -46,12 +56,63 @@ function RealBattleContent() {
     }
   });
 
-  // Load active games on mount
+  // Initialize Pusher and load initial data
   useEffect(() => {
+    // Initialize Pusher
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+    });
+    setPusherClient(pusher);
+
+    // Subscribe to multiplayer channel for lobby updates
+    const multiplayerChannel = pusher.subscribe('multiplayer');
+    
+    multiplayerChannel.bind('lobby-created', (data: any) => {
+      console.log('Lobby created:', data);
+      setLobbies(prev => [data, ...prev]);
+    });
+
+    multiplayerChannel.bind('lobby-updated', (data: any) => {
+      console.log('Lobby updated:', data);
+      setLobbies(prev => prev.map(lobby => 
+        lobby.id === data.id ? data : lobby
+      ));
+    });
+
+    multiplayerChannel.bind('lobby-closed', (data: any) => {
+      console.log('Lobby closed:', data.lobbyId);
+      setLobbies(prev => prev.filter(lobby => lobby.id !== data.lobbyId));
+    });
+
+    multiplayerChannel.bind('battle-created', (data: any) => {
+      console.log('Battle created:', data);
+      setBattles(prev => [data, ...prev]);
+    });
+
+    // Load initial data
     loadActiveGames();
-    const interval = setInterval(loadActiveGames, 5000); // Refresh every 5 seconds
-    return () => clearInterval(interval);
-  }, []);
+    loadOnlineUsers();
+
+    // Set up periodic data refresh (less frequent since we have real-time updates)
+    const interval = setInterval(() => {
+      loadActiveGames();
+      loadOnlineUsers();
+    }, 30000); // Refresh every 30 seconds as fallback
+
+    // Set up heartbeat for online presence
+    const heartbeatInterval = setInterval(() => {
+      if (session?.user) {
+        updateOnlineStatus();
+      }
+    }, 60000); // Update presence every minute
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(heartbeatInterval);
+      pusher.unsubscribe('multiplayer');
+      pusher.disconnect();
+    };
+  }, [session]);
 
   // Update host name when session changes
   useEffect(() => {
@@ -82,6 +143,27 @@ function RealBattleContent() {
     }
   };
 
+  const loadOnlineUsers = async () => {
+    try {
+      const response = await fetch('/api/online-users');
+      const data = await response.json();
+      setOnlineUsers(data.users || []);
+    } catch (error) {
+      console.error('Failed to load online users:', error);
+    }
+  };
+
+  const updateOnlineStatus = async () => {
+    try {
+      await fetch('/api/online-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (error) {
+      console.error('Failed to update online status:', error);
+    }
+  };
+
   const createLobby = async () => {
     if (!hostName.trim()) {
       setError('Please enter a host name');
@@ -107,6 +189,44 @@ function RealBattleContent() {
       if (response.ok && data.lobby) {
         setCurrentLobby(data.lobby);
         setGameState('lobby');
+        
+        // Subscribe to lobby-specific events
+        if (pusherClient) {
+          const lobbyChannel = pusherClient.subscribe(`lobby-${data.lobby.id}`);
+          
+          lobbyChannel.bind('player-joined', (eventData: any) => {
+            console.log('Player joined lobby:', eventData);
+            setCurrentLobby((prev: any) => {
+              if (prev && prev.id === eventData.lobbyId) {
+                return {
+                  ...prev,
+                  players: [...prev.players, eventData.player]
+                };
+              }
+              return prev;
+            });
+          });
+
+          lobbyChannel.bind('player-left', (eventData: any) => {
+            console.log('Player left lobby:', eventData);
+            setCurrentLobby((prev: any) => {
+              if (prev && prev.id === eventData.lobbyId) {
+                return {
+                  ...prev,
+                  players: prev.players.filter((p: any) => p.id !== eventData.playerId)
+                };
+              }
+              return prev;
+            });
+          });
+
+          lobbyChannel.bind('battle-started', (eventData: any) => {
+            console.log('Battle started in lobby:', eventData);
+            setBattle(eventData.battle);
+            setGameState('battle');
+          });
+        }
+        
         await loadActiveGames(); // Refresh the lobby list
       } else {
         setError(data.error || 'Failed to create lobby');
@@ -144,6 +264,44 @@ function RealBattleContent() {
       if (response.ok && data.lobby) {
         setCurrentLobby(data.lobby);
         setGameState('lobby');
+        
+        // Subscribe to lobby-specific events
+        if (pusherClient) {
+          const lobbyChannel = pusherClient.subscribe(`lobby-${data.lobby.id}`);
+          
+          lobbyChannel.bind('player-joined', (eventData: any) => {
+            console.log('Player joined lobby:', eventData);
+            setCurrentLobby((prev: any) => {
+              if (prev && prev.id === eventData.lobbyId) {
+                return {
+                  ...prev,
+                  players: [...prev.players, eventData.player]
+                };
+              }
+              return prev;
+            });
+          });
+
+          lobbyChannel.bind('player-left', (eventData: any) => {
+            console.log('Player left lobby:', eventData);
+            setCurrentLobby((prev: any) => {
+              if (prev && prev.id === eventData.lobbyId) {
+                return {
+                  ...prev,
+                  players: prev.players.filter((p: any) => p.id !== eventData.playerId)
+                };
+              }
+              return prev;
+            });
+          });
+
+          lobbyChannel.bind('battle-started', (eventData: any) => {
+            console.log('Battle started in lobby:', eventData);
+            setBattle(eventData.battle);
+            setGameState('battle');
+          });
+        }
+        
         await loadActiveGames();
       } else {
         setError(data.error || 'Failed to join lobby');
@@ -241,11 +399,14 @@ function RealBattleContent() {
           </div>
         )}
 
-        {gameState === 'setup' && (
-          <div>
-            <h1 className="text-3xl font-bold mb-8">Create Multiplayer Battle</h1>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="flex gap-6">
+          {/* Main Content */}
+          <div className="flex-1">
+            {gameState === 'setup' && (
+              <div>
+                <h1 className="text-3xl font-bold mb-8">Create Multiplayer Battle</h1>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Create New Lobby */}
               <div className="bg-gray-800 rounded-lg p-6">
                 <h2 className="text-xl font-semibold mb-4">Create New Lobby</h2>
@@ -533,6 +694,44 @@ function RealBattleContent() {
             </div>
           </div>
         )}
+        </div>
+
+        {/* Online Users Sidebar */}
+        <div className="w-80 bg-gray-800 rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center">
+            <span className="w-3 h-3 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+            Online Users ({onlineUsers.length})
+          </h2>
+          
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {onlineUsers.length === 0 ? (
+              <p className="text-gray-400 text-sm">No users online</p>
+            ) : (
+              onlineUsers.map((user) => (
+                <div key={user.id} className="flex items-center space-x-3 p-2 bg-gray-700 rounded-lg">
+                  {user.avatar ? (
+                    <img 
+                      src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`}
+                      alt={user.username}
+                      className="w-8 h-8 rounded-full"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
+                      <span className="text-xs font-semibold">{user.username.charAt(0).toUpperCase()}</span>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{user.username}</p>
+                    <p className="text-xs text-gray-400">
+                      Last seen: {new Date(user.lastSeen).toLocaleTimeString()}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+        </div>
       </div>
     </div>
   );

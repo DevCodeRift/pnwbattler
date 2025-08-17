@@ -33,6 +33,15 @@ export async function POST(request: NextRequest) {
     }
 
     const discordId = (session.user as any).discordId;
+    console.log('POST verification - discordId:', discordId);
+    console.log('POST verification - session.user:', session.user);
+    
+    if (!discordId) {
+      return NextResponse.json(
+        { error: 'Discord ID not found in session' },
+        { status: 400 }
+      );
+    }
 
     // Verify the nation exists in P&W API
     try {
@@ -78,6 +87,9 @@ export async function POST(request: NextRequest) {
       nationId,
       expires,
     });
+    
+    console.log('POST verification - Code stored for discordId:', discordId, 'code:', code);
+    console.log('POST verification - verificationCodes size:', verificationCodes.size);
 
     // Send verification message to the nation via P&W REST API
     try {
@@ -159,11 +171,19 @@ export async function PUT(request: NextRequest) {
     }
 
     const discordId = (session.user as any).discordId;
+    console.log('PUT verification - discordId:', discordId);
+    console.log('PUT verification - available codes:', Array.from(verificationCodes.keys()));
+    
     const verification = verificationCodes.get(discordId);
 
     if (!verification) {
+      console.log('No verification found for discordId:', discordId);
+      // Try to find verification by checking all entries (fallback for potential key mismatch)
+      const allVerifications = Array.from(verificationCodes.entries());
+      console.log('All verifications:', allVerifications.map(([key, val]) => ({ key, code: val.code, expires: val.expires })));
+      
       return NextResponse.json(
-        { error: 'No verification request found' },
+        { error: 'No verification request found. Please request a new verification code.' },
         { status: 404 }
       );
     }
