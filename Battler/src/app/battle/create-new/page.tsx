@@ -1,11 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '../../../stores';
 import BattleSetup from '@/components/BattleSetup';
 import BattleInterface from '@/components/BattleInterface';
 import { BattleSession } from '@/types/simulation';
 
 export default function CreateBattlePage() {
+  const { data: session } = useSession();
+  const { isVerified, pwNation } = useAuthStore();
+  const router = useRouter();
   const [currentSession, setCurrentSession] = useState<BattleSession | null>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const [currentNationId, setCurrentNationId] = useState<string>('');
@@ -13,9 +19,35 @@ export default function CreateBattlePage() {
   const [error, setError] = useState<string>('');
   const [openLobbies, setOpenLobbies] = useState<any[]>([]);
 
+  // Authentication check and redirect
   useEffect(() => {
-    loadOpenLobbies();
-  }, []);
+    if (!session) {
+      router.push('/login');
+      return;
+    }
+    if (!isVerified || !pwNation) {
+      router.push('/verify');
+      return;
+    }
+  }, [session, isVerified, pwNation, router]);
+
+  useEffect(() => {
+    if (session && isVerified && pwNation) {
+      loadOpenLobbies();
+    }
+  }, [session, isVerified, pwNation]);
+
+  // Don't render content while redirecting for authentication
+  if (!session || !isVerified || !pwNation) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-300">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   const loadOpenLobbies = async () => {
     try {

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useAuthStore } from '../../../stores';
 import Pusher from 'pusher-js';
 import MultiplayerBattleInterface from '../../../components/MultiplayerBattleInterface';
 
@@ -30,6 +31,8 @@ interface OnlineUser {
 
 function RealBattleContent() {
   const { data: session } = useSession();
+  const { isVerified, pwNation } = useAuthStore();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [gameState, setGameState] = useState<'setup' | 'lobby' | 'battle' | 'spectating'>('setup');
   const [currentLobby, setCurrentLobby] = useState<any>(null);
@@ -41,6 +44,18 @@ function RealBattleContent() {
   const [error, setError] = useState<string>('');
   const [pusherClient, setPusherClient] = useState<Pusher | null>(null);
   const pusherRef = useRef<Pusher | null>(null);
+
+  // Redirect unauthenticated users
+  useEffect(() => {
+    if (!session) {
+      router.push('/login');
+      return;
+    }
+    if (!isVerified || !pwNation) {
+      router.push('/verify');
+      return;
+    }
+  }, [session, isVerified, pwNation, router]);
 
   // Form state for creating lobby
   const [hostName, setHostName] = useState(session?.user?.name || '');
@@ -555,18 +570,13 @@ function RealBattleContent() {
     console.log('Joining as spectator for battle:', battleId);
   };
 
-  if (!session) {
+  // Don't render anything while redirecting for authentication
+  if (!session || !isVerified || !pwNation) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Authentication Required</h1>
-          <p className="text-gray-300 mb-6">Please log in to access multiplayer battles</p>
-          <button 
-            onClick={() => window.location.href = '/'}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded"
-          >
-            Go to Login
-          </button>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-300">Checking authentication...</p>
         </div>
       </div>
     );

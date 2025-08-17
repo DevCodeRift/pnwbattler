@@ -1,6 +1,38 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '../../../stores';
+
 export default function JoinBattlePage() {
+  const { data: session } = useSession();
+  const { isVerified, pwNation } = useAuthStore();
+  const router = useRouter();
+
+  // Authentication check and redirect
+  useEffect(() => {
+    if (!session) {
+      router.push('/login');
+      return;
+    }
+    if (!isVerified || !pwNation) {
+      router.push('/verify');
+      return;
+    }
+  }, [session, isVerified, pwNation, router]);
+
+  // Don't render content while redirecting for authentication
+  if (!session || !isVerified || !pwNation) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-300">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="space-y-6">
       <div className="border-b border-gray-700 pb-4">
