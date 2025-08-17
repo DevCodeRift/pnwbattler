@@ -699,6 +699,17 @@ function RealBattleContent() {
                 {/* Waiting Lobbies */}
                 <div className="mb-6">
                   <h3 className="text-lg font-medium mb-3">Open Lobbies ({lobbies.length})</h3>
+                  
+                  {/* Debug Test Button */}
+                  <div className="mb-4 p-2 bg-red-800 rounded">
+                    <button 
+                      onClick={testButtonClick}
+                      className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm"
+                    >
+                      Test Button Click (Debug)
+                    </button>
+                  </div>
+                  
                   {lobbies.length === 0 ? (
                     <p className="text-gray-400">No open lobbies available</p>
                   ) : (
