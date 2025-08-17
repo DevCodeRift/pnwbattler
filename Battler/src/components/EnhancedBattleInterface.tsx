@@ -279,6 +279,28 @@ export default function EnhancedBattleInterface({ session, currentNationId, time
               </div>
             )}
 
+            {/* Attacker Resources and Military */}
+            <div className="mb-6 space-y-4">
+              <div>
+                <h4 className="text-lg font-bold mb-2">Resources</h4>
+                <div className="space-y-2 text-sm">
+                  <div>Money: ${formatNumber(currentNation.resources.money)}</div>
+                  <div>Munitions: {currentNation.resources.munitions}</div>
+                  <div>Gasoline: {currentNation.resources.gasoline}</div>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="text-lg font-bold mb-2">Military</h4>
+                <div className="space-y-2 text-sm">
+                  <div>👥 Soldiers: {formatNumber(currentNation.military.soldiers)}</div>
+                  <div>🏗️ Tanks: {formatNumber(currentNation.military.tanks)}</div>
+                  <div>✈️ Aircraft: {currentNation.military.aircraft}</div>
+                  <div>🚢 Ships: {currentNation.military.ships}</div>
+                </div>
+              </div>
+            </div>
+
             {/* Action Buttons */}
             <div className="flex space-x-4">
               {selectedAction && (
@@ -335,13 +357,20 @@ export default function EnhancedBattleInterface({ session, currentNationId, time
             <div className="space-y-4">
               <div>
                 <h4 className="text-lg font-bold mb-2">Resources</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>Money: ${formatNumber(currentNation.resources.money)}</div>
+                <div className="space-y-2 text-sm">
                   <div>Money: ${formatNumber(enemy.resources.money)}</div>
-                  <div>Munitions: {currentNation.resources.munitions}</div>
                   <div>Munitions: {enemy.resources.munitions}</div>
-                  <div>Gasoline: {currentNation.resources.gasoline}</div>
                   <div>Gasoline: {enemy.resources.gasoline}</div>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="text-lg font-bold mb-2">Military</h4>
+                <div className="space-y-2 text-sm">
+                  <div>👥 Soldiers: {formatNumber(enemy.military.soldiers)}</div>
+                  <div>🏗️ Tanks: {formatNumber(enemy.military.tanks)}</div>
+                  <div>✈️ Aircraft: {enemy.military.aircraft}</div>
+                  <div>🚢 Ships: {enemy.military.ships}</div>
                 </div>
               </div>
             </div>

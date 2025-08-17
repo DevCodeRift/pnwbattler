@@ -345,7 +345,7 @@ export default function RealNationBattlePage() {
           action: 'execute_action',
           sessionId: battleSession.id,
           nationId: attackingNationId,
-          actionData: action
+          battleAction: action
         })
       });
 
