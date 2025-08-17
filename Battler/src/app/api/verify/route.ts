@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../lib/auth';
 import { apolloClient, GET_NATION_BY_ID } from '../../../lib/apollo-client';
+import { prisma } from '../../../lib/prisma';
 
 // This would normally connect to a database to store verification codes
 // For now, we'll use a simple in-memory store (not suitable for production)
@@ -11,6 +12,52 @@ const verificationCodes = new Map<string, {
   nationId: string;
   expires: Date;
 }>();
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const discordId = (session.user as any).discordId;
+    
+    if (!discordId) {
+      return NextResponse.json(
+        { error: 'Discord ID not found in session' },
+        { status: 400 }
+      );
+    }
+
+    // Check if user is verified in database
+    const user = await prisma.user.findUnique({
+      where: { discordId },
+    });
+    
+    if (user && user.isVerified && user.pwNationData) {
+      return NextResponse.json({
+        verified: true,
+        nation: user.pwNationData,
+        verifiedAt: user.verifiedAt,
+      });
+    } else {
+      return NextResponse.json({
+        verified: false,
+      });
+    }
+
+  } catch (error) {
+    console.error('Error checking verification status:', error);
+    return NextResponse.json(
+      { error: 'Failed to check verification status' },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -222,6 +269,30 @@ export async function PUT(request: NextRequest) {
 
       // Verification successful
       verificationCodes.delete(discordId);
+
+      // Save or update user in database
+      await prisma.user.upsert({
+        where: { discordId },
+        update: {
+          isVerified: true,
+          pwNationId: verification.nationId,
+          pwNationName: nation.nation_name,
+          pwNationData: nation,
+          verifiedAt: new Date(),
+          discordUsername: (session.user as any).username || session.user.name,
+          discordAvatar: (session.user as any).avatar,
+        },
+        create: {
+          discordId,
+          discordUsername: (session.user as any).username || session.user.name || 'Unknown',
+          discordAvatar: (session.user as any).avatar,
+          isVerified: true,
+          pwNationId: verification.nationId,
+          pwNationName: nation.nation_name,
+          pwNationData: nation,
+          verifiedAt: new Date(),
+        },
+      });
 
       // Return the nation data along with verification success
       return NextResponse.json({

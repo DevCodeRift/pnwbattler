@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { BattleConfig, BattlePlayer, Nation, DiscordUser } from '../types';
 
 interface AuthState {
@@ -39,27 +40,39 @@ interface UIState {
   setError: (error: string | null) => void;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  isAuthenticated: false,
-  pwNation: null,
-  isVerified: false,
-  login: (user) => set({ user, isAuthenticated: true }),
-  logout: () => set({ 
-    user: null, 
-    isAuthenticated: false, 
-    pwNation: null, 
-    isVerified: false 
-  }),
-  setPWNation: (nation) => {
-    set({ pwNation: nation });
-    // Auto-verify if nation is set
-    if (nation) {
-      set({ isVerified: true });
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      isAuthenticated: false,
+      pwNation: null,
+      isVerified: false,
+      login: (user) => set({ user, isAuthenticated: true }),
+      logout: () => set({ 
+        user: null, 
+        isAuthenticated: false, 
+        pwNation: null, 
+        isVerified: false 
+      }),
+      setPWNation: (nation) => {
+        set({ pwNation: nation });
+        // Auto-verify if nation is set
+        if (nation) {
+          set({ isVerified: true });
+        }
+      },
+      setVerified: (verified) => set({ isVerified: verified }),
+    }),
+    {
+      name: 'pnw-battler-auth',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        pwNation: state.pwNation,
+        isVerified: state.isVerified,
+      }),
     }
-  },
-  setVerified: (verified) => set({ isVerified: verified }),
-}));
+  )
+);
 
 export const useBattleStore = create<BattleState>((set, get) => ({
   currentBattle: null,

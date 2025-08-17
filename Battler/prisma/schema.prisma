@@ -85,6 +85,25 @@ model OnlineUser {
   @@map("online_users")
 }
 
+model User {
+  id              String    @id @default(cuid())
+  discordId       String    @unique
+  discordUsername String
+  discordAvatar   String?
+  
+  // P&W Nation verification
+  isVerified      Boolean   @default(false)
+  pwNationId      String?   @unique
+  pwNationName    String?
+  pwNationData    Json?     // Store full nation data
+  verifiedAt      DateTime?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("users")
+}
+
 enum LobbyStatus {
   WAITING
   IN_PROGRESS

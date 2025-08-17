@@ -19,6 +19,18 @@ import {
   BattleMode
 } from '../types/simulation';
 
+import {
+  BattleUnit,
+  BattleResult,
+  VictoryType,
+  calculateGroundAttack,
+  calculateAirAttack,
+  calculateNavalAttack,
+  calculateVictoryProbabilities,
+  roll,
+  getVictoryType
+} from './battle-calculator';
+
 export class BattleSimulationEngine {
   private sessions: Map<string, BattleSession> = new Map();
   private timers: Map<string, NodeJS.Timeout> = new Map();
@@ -474,43 +486,56 @@ export class BattleSimulationEngine {
   }
 
   /**
-   * Calculate battle results using actual P&W battle mechanics
+   * Calculate battle results using Locutus-based P&W battle mechanics
    */
   private calculateBattleResult(attacker: SimulatedNation, defender: SimulatedNation, attackType: AttackType) {
-    // Only ground battles use the detailed casualty formulas provided
-    if (attackType !== AttackType.GROUND) {
-      return this.calculateNonGroundBattle(attacker, defender, attackType);
+    // Convert SimulatedNation to BattleUnit format
+    const attackerUnit: BattleUnit = this.convertToBattleUnit(attacker);
+    const defenderUnit: BattleUnit = this.convertToBattleUnit(defender);
+    
+    let result: BattleResult;
+    
+    switch (attackType) {
+      case AttackType.GROUND:
+        result = calculateGroundAttack(
+          attackerUnit,
+          defenderUnit,
+          attacker.military.soldiers,
+          attacker.military.tanks,
+          attacker.resources.munitions > 0
+        );
+        break;
+        
+      case AttackType.AIR:
+        result = calculateAirAttack(
+          attackerUnit,
+          defenderUnit,
+          attacker.military.aircraft,
+          'soldiers' // Default air target
+        );
+        break;
+        
+      case AttackType.NAVAL:
+        result = calculateNavalAttack(
+          attackerUnit,
+          defenderUnit,
+          attacker.military.ships
+        );
+        break;
+        
+      default:
+        throw new Error(`Unsupported attack type: ${attackType}`);
     }
-
-    // Calculate army values for ground battle
-    const attackerArmyValue = this.calculateGroundArmyValue(attacker);
-    const defenderArmyValue = this.calculateGroundArmyValue(defender);
     
-    console.log('Ground army values:', { attacker: attackerArmyValue, defender: defenderArmyValue });
+    // Convert VictoryType to legacy outcome format
+    const outcomeMap = {
+      [VictoryType.UTTERLY_FAILS]: 'UF' as const,
+      [VictoryType.PYRRHIC_VICTORY]: 'PV' as const,
+      [VictoryType.MODERATE_SUCCESS]: 'MS' as const,
+      [VictoryType.IMMENSE_TRIUMPH]: 'IT' as const
+    };
     
-    // Perform 3 battle rolls (0.4x to 1.0x army value)
-    const attackerRolls = this.performBattleRolls(attackerArmyValue);
-    const defenderRolls = this.performBattleRolls(defenderArmyValue);
-    
-    // Count wins for attacker
-    let attackerWins = 0;
-    for (let i = 0; i < 3; i++) {
-      if (attackerRolls[i] > defenderRolls[i]) {
-        attackerWins++;
-      }
-    }
-    
-    // Determine battle outcome
-    let outcome: 'IT' | 'MS' | 'PV' | 'UF';
-    if (attackerWins === 3) outcome = 'IT'; // Immense Triumph
-    else if (attackerWins === 2) outcome = 'MS'; // Moderate Success  
-    else if (attackerWins === 1) outcome = 'PV'; // Pyrrhic Victory
-    else outcome = 'UF'; // Utter Failure
-    
-    // Calculate losses using actual P&W formulas
-    const { attackerLosses, defenderLosses } = this.calculatePnWGroundCasualties(
-      attacker, defender, attackerArmyValue, defenderArmyValue, attackerWins >= 2
-    );
+    const outcome = outcomeMap[result.victoryType];
     
     // Calculate resource consumption
     const resourcesUsed = this.calculateResourceConsumption(attacker, attackType);
@@ -518,38 +543,133 @@ export class BattleSimulationEngine {
     // Prepare detailed battle calculations
     const battleCalculations = {
       attackerUnitsUsed: {
-        soldiers: attacker.military.soldiers,
-        tanks: attacker.military.tanks
+        soldiers: attackType === AttackType.GROUND ? attacker.military.soldiers : 0,
+        tanks: attackType === AttackType.GROUND ? attacker.military.tanks : 0,
+        aircraft: attackType === AttackType.AIR ? attacker.military.aircraft : 0,
+        ships: attackType === AttackType.NAVAL ? attacker.military.ships : 0
       },
       defenderUnitsDefending: {
         soldiers: defender.military.soldiers,
-        tanks: defender.military.tanks
+        tanks: defender.military.tanks,
+        aircraft: defender.military.aircraft,
+        ships: defender.military.ships
       },
-      attackerStrength: attackerArmyValue,
-      defenderStrength: defenderArmyValue,
-      strengthRatio: attackerArmyValue / Math.max(defenderArmyValue, 1),
+      attackerStrength: this.calculateAttackStrength(attacker, attackType),
+      defenderStrength: this.calculateDefenseStrength(defender, attackType),
+      strengthRatio: this.calculateAttackStrength(attacker, attackType) / Math.max(this.calculateDefenseStrength(defender, attackType), 1),
       rollResults: {
-        roll1: attackerRolls[0],
-        roll2: attackerRolls[1],
-        roll3: attackerRolls[2],
-        bestRoll: Math.max(...attackerRolls)
+        roll1: result.roll,
+        roll2: result.roll,
+        roll3: result.roll,
+        bestRoll: result.roll
       },
       hadMunitions: attacker.resources.munitions > 0,
       hadGasoline: attacker.resources.gasoline > 0
     };
     
-    console.log('Battle outcome:', outcome, 'Attacker wins:', attackerWins);
+    console.log('Locutus battle outcome:', outcome, 'Victory type:', result.victoryType, 'Roll:', result.roll);
     
     return {
-      success: attackerWins >= 2, // MS or IT considered success
+      success: result.victoryType >= VictoryType.MODERATE_SUCCESS,
       outcome,
-      attackerWins,
-      attackerLosses,
-      defenderLosses,
+      attackerWins: result.victoryType >= VictoryType.MODERATE_SUCCESS ? 2 : (result.victoryType >= VictoryType.PYRRHIC_VICTORY ? 1 : 0),
+      attackerLosses: {
+        soldiers: result.attackerLosses.soldiers,
+        tanks: result.attackerLosses.tanks,
+        aircraft: result.attackerLosses.aircraft,
+        ships: result.attackerLosses.ships
+      },
+      defenderLosses: {
+        soldiers: result.defenderLosses.soldiers,
+        tanks: result.defenderLosses.tanks,
+        aircraft: result.defenderLosses.aircraft,
+        ships: result.defenderLosses.ships
+      },
       resourcesUsed,
       battleCalculations,
-      rolls: { attacker: attackerRolls, defender: defenderRolls }
+      rolls: { attacker: [result.roll, result.roll, result.roll], defender: [0, 0, 0] }
     };
+  }
+
+  /**
+   * Convert SimulatedNation to BattleUnit format
+   */
+  private convertToBattleUnit(nation: SimulatedNation): BattleUnit {
+    return {
+      soldiers: nation.military.soldiers,
+      tanks: nation.military.tanks,
+      aircraft: nation.military.aircraft,
+      ships: nation.military.ships,
+      munitions: nation.resources.munitions,
+      gasoline: nation.resources.gasoline,
+      money: nation.resources.money,
+      avgInfra: this.calculateAverageInfrastructure(nation),
+      cities: nation.cities.length,
+      isGroundControl: nation.battleEffects?.groundControl || false,
+      isAirControl: nation.battleEffects?.airSuperiority || false,
+      isBlockaded: false, // Not implemented in current type
+      isFortified: false, // Not implemented in current type
+      actionPoints: nation.maps || 12, // Use MAPs as action points
+      resistance: nation.resistance
+    };
+  }
+
+  /**
+   * Calculate average infrastructure across all cities
+   */
+  private calculateAverageInfrastructure(nation: SimulatedNation): number {
+    if (nation.cities.length === 0) return 0;
+    
+    const totalInfra = nation.cities.reduce((sum, city) => sum + city.infrastructure, 0);
+    return totalInfra / nation.cities.length;
+  }
+
+  /**
+   * Calculate attack strength for different battle types
+   */
+  private calculateAttackStrength(nation: SimulatedNation, attackType: AttackType): number {
+    const hasMunitions = nation.resources.munitions > 0;
+    const hasGasoline = nation.resources.gasoline > 0;
+    
+    switch (attackType) {
+      case AttackType.GROUND:
+        const soldierStr = nation.military.soldiers * (hasMunitions ? 1.75 : 1);
+        const tankStr = (hasMunitions && hasGasoline) ? nation.military.tanks * 40 : 0;
+        return soldierStr + tankStr;
+        
+      case AttackType.AIR:
+        return nation.military.aircraft;
+        
+      case AttackType.NAVAL:
+        return nation.military.ships;
+        
+      default:
+        return 0;
+    }
+  }
+
+  /**
+   * Calculate defense strength for different battle types
+   */
+  private calculateDefenseStrength(nation: SimulatedNation, attackType: AttackType): number {
+    const hasMunitions = nation.resources.munitions > 0;
+    const hasGasoline = nation.resources.gasoline > 0;
+    
+    switch (attackType) {
+      case AttackType.GROUND:
+        const soldierStr = Math.max(50, nation.military.soldiers * (hasMunitions ? 1.75 : 1));
+        const tankStr = (hasMunitions && hasGasoline) ? Math.min(nation.military.tanks, nation.cities.length * 250) * 40 : 0;
+        return soldierStr + tankStr;
+        
+      case AttackType.AIR:
+        return Math.min(nation.military.aircraft, nation.cities.length * 15);
+        
+      case AttackType.NAVAL:
+        return nation.military.ships;
+        
+      default:
+        return 0;
+    }
   }
 
   /**
