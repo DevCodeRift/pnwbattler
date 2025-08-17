@@ -39,7 +39,10 @@ export default function TestMessagePage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error || 'Failed to send test message');
+        // Show detailed error information
+        const errorMsg = data?.error || 'Failed to send test message';
+        const details = data?.response ? ` - ${JSON.stringify(data.response)}` : '';
+        throw new Error(errorMsg + details);
       }
 
       setResult(data);

@@ -22,11 +22,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate nation ID is numeric
+    if (!/^\d+$/.test(nationId.toString())) {
+      return NextResponse.json(
+        { error: 'Nation ID must be a number' },
+        { status: 400 }
+      );
+    }
+
     const apiKey = process.env.PW_BOT_API_KEY || process.env.NEXT_PUBLIC_PW_API_KEY;
+    
+    console.log('Environment check:');
+    console.log('- PW_BOT_API_KEY exists:', !!process.env.PW_BOT_API_KEY);
+    console.log('- NEXT_PUBLIC_PW_API_KEY exists:', !!process.env.NEXT_PUBLIC_PW_API_KEY);
+    console.log('- Using API key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'NONE');
     
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'No API key configured' },
+        { error: 'No API key configured - check PW_BOT_API_KEY environment variable' },
         { status: 500 }
       );
     }
@@ -34,25 +47,25 @@ export async function POST(request: NextRequest) {
     console.log(`Attempting to send test message to nation ${nationId}`);
     console.log(`Using API key: ${apiKey.substring(0, 8)}...`);
 
-    // Send test message via P&W REST API
-    const messageResponse = await fetch('https://politicsandwar.com/api/send-message/', {
+    const messageParams = {
+      key: apiKey,
+      to: nationId,
+      subject: 'PnW Battler Test Message',
+      message: 'This is a test message from PnW Battler to verify our message API is working. If you receive this, the integration is successful!'
+    };
+
+    console.log('Request parameters:', {
+      ...messageParams,
+      key: `${apiKey.substring(0, 8)}...`
+    });
+
+    // Send test message via P&W V2 REST API (send-message is still on V2)
+    const messageResponse = await fetch('https://politicsandwar.com/api/v2/send-message/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({
-        key: apiKey,
-        to: nationId,
-        subject: 'PnW Battler - Test Message',
-        message: `
-          <h3>Test Message from PnW Battler</h3>
-          <p>This is a test message to verify that our message sending API is working correctly.</p>
-          <p>Sent at: ${new Date().toISOString()}</p>
-          <p>From: ${(session.user as any).username || 'Unknown User'}</p>
-          <hr>
-          <p><em>This is an automated test message.</em></p>
-        `.trim()
-      }),
+      body: new URLSearchParams(messageParams),
     });
 
     console.log(`Message API response status: ${messageResponse.status}`);
@@ -78,11 +91,20 @@ export async function POST(request: NextRequest) {
       const errorText = await messageResponse.text();
       console.error('Message API error response:', errorText);
       
+      // Try to parse as JSON first
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { raw: errorText };
+      }
+      
       return NextResponse.json({
         success: false,
         error: 'HTTP error from P&W API',
         status: messageResponse.status,
-        response: errorText
+        statusText: messageResponse.statusText,
+        response: errorData
       }, { status: 500 });
     }
 
