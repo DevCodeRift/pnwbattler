@@ -14,9 +14,26 @@ export default function EnhancedBattleInterface({ session, currentNationId, time
   const [selectedAction, setSelectedAction] = useState('');
   const [battleOdds, setBattleOdds] = useState({ IT: 0, MS: 0, PV: 0, UF: 0 });
   const [lastBattleResult, setLastBattleResult] = useState<any>(null);
+  const [showTimeline, setShowTimeline] = useState(false);
 
   const currentNation = session.participants.find(p => p.id === currentNationId);
   const enemy = session.participants.find(p => p.id !== currentNationId);
+
+  // Update last battle result when session changes
+  useEffect(() => {
+    if (session.battleHistory && session.battleHistory.length > 0) {
+      const latestBattle = session.battleHistory[session.battleHistory.length - 1];
+      setLastBattleResult({
+        outcome: latestBattle.outcome,
+        attackerLosses: latestBattle.attackerLosses,
+        defenderLosses: latestBattle.defenderLosses,
+        timestamp: latestBattle.timestamp,
+        attackType: latestBattle.attackType,
+        attackerName: latestBattle.attackerName,
+        defenderName: latestBattle.defenderName
+      });
+    }
+  }, [session]);
 
   // Calculate battle odds based on army values
   const calculateBattleOdds = (attackType: string) => {
@@ -323,7 +340,10 @@ export default function EnhancedBattleInterface({ session, currentNationId, time
                   {selectedAction === 'peace' && 'Offer Peace'}
                 </button>
               )}
-              <button className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded font-medium">
+              <button 
+                className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded font-medium"
+                onClick={() => setShowTimeline(true)}
+              >
                 📊 War Timeline
               </button>
             </div>
@@ -377,6 +397,111 @@ export default function EnhancedBattleInterface({ session, currentNationId, time
           </div>
         </div>
       </div>
+
+      {/* War Timeline Modal */}
+      {showTimeline && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">War Timeline</h2>
+              <button 
+                onClick={() => setShowTimeline(false)}
+                className="text-gray-400 hover:text-white text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {session.battleHistory && session.battleHistory.length > 0 ? (
+                session.battleHistory.slice().reverse().map((battle, index) => (
+                  <div key={battle.id} className="bg-gray-700 rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h3 className="font-bold text-lg">
+                          Turn {battle.turn}: {battle.attackType.charAt(0).toUpperCase() + battle.attackType.slice(1)} Attack
+                        </h3>
+                        <p className="text-gray-400 text-sm">
+                          {new Date(battle.timestamp).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className={`px-3 py-1 rounded text-sm font-bold ${
+                        battle.outcome === 'Immense Triumph' ? 'bg-green-600' :
+                        battle.outcome === 'Moderate Success' ? 'bg-yellow-600' :
+                        battle.outcome === 'Pyrrhic Victory' ? 'bg-orange-600' :
+                        'bg-red-600'
+                      }`}>
+                        {battle.outcome}
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="font-semibold text-blue-400 mb-2">
+                          {battle.attackerName} (Attacker)
+                        </h4>
+                        <div className="text-sm space-y-1">
+                          {battle.attackerLosses.soldiers && (
+                            <p>👥 Lost {battle.attackerLosses.soldiers.toLocaleString()} soldiers</p>
+                          )}
+                          {battle.attackerLosses.tanks && (
+                            <p>🏗️ Lost {battle.attackerLosses.tanks.toLocaleString()} tanks</p>
+                          )}
+                          {battle.attackerLosses.aircraft && (
+                            <p>✈️ Lost {battle.attackerLosses.aircraft.toLocaleString()} aircraft</p>
+                          )}
+                          {battle.attackerLosses.ships && (
+                            <p>🚢 Lost {battle.attackerLosses.ships.toLocaleString()} ships</p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-semibold text-red-400 mb-2">
+                          {battle.defenderName} (Defender)
+                        </h4>
+                        <div className="text-sm space-y-1">
+                          {battle.defenderLosses.soldiers && (
+                            <p>👥 Lost {battle.defenderLosses.soldiers.toLocaleString()} soldiers</p>
+                          )}
+                          {battle.defenderLosses.tanks && (
+                            <p>🏗️ Lost {battle.defenderLosses.tanks.toLocaleString()} tanks</p>
+                          )}
+                          {battle.defenderLosses.aircraft && (
+                            <p>✈️ Lost {battle.defenderLosses.aircraft.toLocaleString()} aircraft</p>
+                          )}
+                          {battle.defenderLosses.ships && (
+                            <p>🚢 Lost {battle.defenderLosses.ships.toLocaleString()} ships</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {(battle.resourcesUsed.munitions || battle.resourcesUsed.gasoline) && (
+                      <div className="mt-3 pt-3 border-t border-gray-600">
+                        <h4 className="font-semibold text-purple-400 mb-1">Resources Used</h4>
+                        <div className="text-sm">
+                          {battle.resourcesUsed.munitions && (
+                            <span className="mr-4">💥 {battle.resourcesUsed.munitions.toLocaleString()} munitions</span>
+                          )}
+                          {battle.resourcesUsed.gasoline && (
+                            <span>⛽ {battle.resourcesUsed.gasoline.toLocaleString()} gasoline</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-center text-gray-400 py-8">
+                  <p>No battles have occurred yet.</p>
+                  <p className="text-sm mt-2">Launch an attack to see battle results here!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

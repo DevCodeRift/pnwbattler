@@ -156,8 +156,35 @@ export interface BattleSession {
   turnTimer: number;
   isActive: boolean;
   winner?: string;
+  battleHistory?: BattleHistoryEntry[];
   created_at: string;
   updated_at: string;
+}
+
+export interface BattleHistoryEntry {
+  id: string;
+  turn: number;
+  timestamp: string;
+  attackerName: string;
+  defenderName: string;
+  attackType: 'ground' | 'air' | 'naval' | 'missile' | 'nuke';
+  outcome: 'Immense Triumph' | 'Moderate Success' | 'Pyrrhic Victory' | 'Utter Failure';
+  attackerLosses: {
+    soldiers?: number;
+    tanks?: number;
+    aircraft?: number;
+    ships?: number;
+  };
+  defenderLosses: {
+    soldiers?: number;
+    tanks?: number;
+    aircraft?: number;
+    ships?: number;
+  };
+  resourcesUsed: {
+    munitions?: number;
+    gasoline?: number;
+  };
 }
 
 export interface BattleAction {

@@ -54,6 +54,7 @@ export class BattleSimulationEngine {
       currentTurn: 1,
       turnTimer: settings.turnCooldown,
       isActive: false,
+      battleHistory: [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -248,6 +249,34 @@ export class BattleSimulationEngine {
 
     // Deduct resources used in attack
     this.deductResources(attacker, battleResult.resourcesUsed);
+
+    // Add battle result to history
+    if (!session.battleHistory) {
+      session.battleHistory = [];
+    }
+    
+    // Convert outcome code to full name
+    const outcomeMap = {
+      'IT': 'Immense Triumph' as const,
+      'MS': 'Moderate Success' as const,
+      'PV': 'Pyrrhic Victory' as const,
+      'UF': 'Utter Failure' as const
+    };
+    
+    const historyEntry = {
+      id: `battle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      turn: session.currentTurn,
+      timestamp: new Date().toISOString(),
+      attackerName: attacker.nation_name,
+      defenderName: target.nation_name,
+      attackType: attackType.toLowerCase() as 'ground' | 'air' | 'naval',
+      outcome: outcomeMap[battleResult.outcome as keyof typeof outcomeMap],
+      attackerLosses: battleResult.attackerLosses,
+      defenderLosses: battleResult.defenderLosses,
+      resourcesUsed: battleResult.resourcesUsed
+    };
+    
+    session.battleHistory.push(historyEntry);
 
     session.updated_at = new Date().toISOString();
     console.log('Attack completed, remaining MAPs:', attacker.maps);
