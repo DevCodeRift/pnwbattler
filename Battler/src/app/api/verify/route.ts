@@ -99,8 +99,8 @@ If you did not request this verification, please ignore this message.
       if (!apiKey) {
         console.error('No API key found for sending messages');
       } else {
-        // Use P&W V2 REST API to send message (send-message endpoint is still V2)
-        const messageResponse = await fetch('https://politicsandwar.com/api/v2/send-message/', {
+        // Use P&W REST API to send message (send-message is the exception that remains on original API)
+        const messageResponse = await fetch('https://politicsandwar.com/api/send-message/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',

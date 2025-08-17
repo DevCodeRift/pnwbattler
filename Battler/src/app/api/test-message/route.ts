@@ -59,8 +59,8 @@ export async function POST(request: NextRequest) {
       key: `${apiKey.substring(0, 8)}...`
     });
 
-    // Send test message via P&W V2 REST API (send-message is still on V2)
-    const messageResponse = await fetch('https://politicsandwar.com/api/v2/send-message/', {
+    // Send test message via P&W REST API (send-message is the exception that remains on the original API)
+    const messageResponse = await fetch('https://politicsandwar.com/api/send-message/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
