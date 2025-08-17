@@ -24,22 +24,70 @@ interface Battle {
   startedAt: string;
 }
 
+interface MyGame {
+  id: string;
+  hostName: string;
+  playerCount: number;
+  spectatorCount: number;
+  status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED';
+  settings: any;
+  createdAt: string;
+  battle?: {
+    id: string;
+    status: string;
+    startedAt: string;
+  };
+  myRole: {
+    isHost: boolean;
+    isReady: boolean;
+    name: string;
+  };
+}
+
 export default function HomePage() {
   const { data: session } = useSession();
   const { pwNation, isVerified } = useAuthStore();
   const [activeLobbies, setActiveLobbies] = useState<Lobby[]>([]);
   const [activeBattles, setActiveBattles] = useState<Battle[]>([]);
+  const [myGames, setMyGames] = useState<MyGame[]>([]);
   const [onlineCount, setOnlineCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
+
+  const loadMyGames = async () => {
+    if (!session?.user) return;
+
+    try {
+      const response = await fetch('/api/multiplayer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-my-games' })
+      });
+      
+      const data = await response.json();
+      if (data.myGames) {
+        setMyGames(data.myGames);
+      }
+    } catch (error) {
+      console.error('Failed to load my games:', error);
+    }
+  };
 
   useEffect(() => {
     // Connect to multiplayer server
     vercelMultiplayerManager.connect();
 
+    // Load user's games if logged in
+    if (session?.user) {
+      loadMyGames();
+    }
+
     // Set up event listeners
     const handleConnected = () => {
       setIsConnected(true);
       vercelMultiplayerManager.getActiveGames();
+      if (session?.user) {
+        loadMyGames();
+      }
     };
 
     const handleDisconnected = () => {
@@ -95,6 +143,9 @@ export default function HomePage() {
     const interval = setInterval(() => {
       if (vercelMultiplayerManager.isConnected) {
         vercelMultiplayerManager.getActiveGames();
+        if (session?.user) {
+          loadMyGames();
+        }
       }
     }, 10000);
 
@@ -108,7 +159,7 @@ export default function HomePage() {
       vercelMultiplayerManager.off('lobby-closed', handleLobbyClosed);
       vercelMultiplayerManager.off('battle-created', handleBattleCreated);
     };
-  }, []);
+  }, [session]);
 
   const joinLobby = async (lobbyId: string, asSpectator = false) => {
     if (!session?.user?.name) {
@@ -138,6 +189,23 @@ export default function HomePage() {
     }
     // Navigate to battle page with spectator mode
     window.location.href = `/battle/real?spectate=${battleId}`;
+  };
+
+  const joinMyGame = (game: MyGame) => {
+    if (!session?.user?.name) {
+      alert('Please log in to join games');
+      return;
+    }
+    
+    if (game.status === 'IN_PROGRESS' && game.battle) {
+      // Battle is in progress, go directly to battle
+      console.log('🎮 Joining active battle:', game.battle.id);
+      window.location.href = '/battle/real';
+    } else {
+      // Lobby is waiting, go to lobby
+      console.log('🏛️ Rejoining lobby:', game.id);
+      window.location.href = '/battle/real';
+    }
   };
 
   return (
@@ -214,6 +282,78 @@ export default function HomePage() {
           </div>
         </Link>
       </div>
+
+      {/* My Active Games Section */}
+      {session?.user && myGames.length > 0 && (
+        <div className="bg-gradient-to-r from-green-800 to-blue-800 rounded-lg border border-gray-600">
+          <div className="p-4 border-b border-gray-600">
+            <h2 className="text-xl font-bold text-white flex items-center">
+              <span className="mr-2">🎮</span>
+              My Active Games ({myGames.length})
+            </h2>
+            <p className="text-green-100 text-sm mt-1">Jump back into your ongoing matches</p>
+          </div>
+          <div className="p-4">
+            <div className="space-y-3">
+              {myGames.map((game) => (
+                <div key={game.id} className="bg-gray-700 rounded-lg p-4 flex items-center justify-between border border-gray-600">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-3 h-3 rounded-full ${
+                        game.status === 'IN_PROGRESS' 
+                          ? game.battle ? 'bg-red-400' : 'bg-yellow-400'
+                          : 'bg-green-400'
+                      }`}></div>
+                      <div>
+                        <h3 className="text-white font-semibold">
+                          {game.hostName}&apos;s Game
+                          {game.myRole.isHost && <span className="ml-2 text-xs bg-yellow-600 text-black px-2 py-1 rounded">HOST</span>}
+                        </h3>
+                        <div className="flex items-center space-x-4 text-sm text-gray-300">
+                          <span>{game.playerCount}/2 players</span>
+                          <span>•</span>
+                          <span>
+                            {game.status === 'IN_PROGRESS' && game.battle 
+                              ? `Battle in progress`
+                              : game.status === 'IN_PROGRESS'
+                              ? `Setting up battle`
+                              : `Waiting for players`
+                            }
+                          </span>
+                          {!game.myRole.isReady && game.status === 'WAITING' && (
+                            <>
+                              <span>•</span>
+                              <span className="text-yellow-400">Not ready</span>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-gray-400 text-xs mt-1">
+                          Created {new Date(game.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => joinMyGame(game)}
+                      className={`px-4 py-2 rounded font-medium text-sm transition-colors ${
+                        game.status === 'IN_PROGRESS' && game.battle
+                          ? 'bg-red-600 hover:bg-red-700 text-white'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
+                    >
+                      {game.status === 'IN_PROGRESS' && game.battle
+                        ? '⚔️ Enter Battle'
+                        : '🏛️ Enter Lobby'
+                      }
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-6">

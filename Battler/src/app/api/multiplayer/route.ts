@@ -411,6 +411,56 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      case 'get-my-games': {
+        // Find all lobbies and battles the user is currently in
+        const userLobbies = await prisma.lobby.findMany({
+          where: {
+            players: {
+              some: {
+                discordId: discordId
+              }
+            },
+            status: {
+              in: ['WAITING', 'IN_PROGRESS']
+            }
+          },
+          include: {
+            players: true,
+            spectators: true,
+            battle: true,
+          }
+        });
+
+        const myGames = userLobbies.map((lobby: any) => {
+          const myPlayer = lobby.players.find((p: any) => p.discordId === discordId);
+          
+          return {
+            id: lobby.id,
+            hostName: lobby.hostName,
+            playerCount: lobby.players.length,
+            spectatorCount: lobby.spectators.length,
+            status: lobby.status,
+            settings: lobby.settings,
+            createdAt: lobby.createdAt.toISOString(),
+            battle: lobby.battle ? {
+              id: lobby.battle.id,
+              status: lobby.battle.status,
+              startedAt: lobby.battle.startedAt?.toISOString(),
+            } : null,
+            myRole: {
+              isHost: myPlayer?.isHost || false,
+              isReady: myPlayer?.isReady || false,
+              name: myPlayer?.name
+            }
+          };
+        });
+
+        return NextResponse.json({ 
+          myGames,
+          count: myGames.length
+        });
+      }
+
       case 'start-battle': {
         const { lobbyId } = data;
         
