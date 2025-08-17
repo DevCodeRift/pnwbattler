@@ -237,21 +237,17 @@ export class BattleSimulationEngine {
       return false;
     }
 
-    // Calculate attack results
-    const attackerStrength = this.calculateMilitaryStrength(attacker, attackTypeEnum);
-    const defenderStrength = this.calculateMilitaryStrength(target, attackTypeEnum);
+    // Calculate battle results with mutual losses
+    const battleResult = this.calculateBattleResult(attacker, target, attackTypeEnum);
     
-    console.log('Battle strength:', { attacker: attackerStrength, defender: defenderStrength });
-    
-    const success = attackerStrength > defenderStrength * Math.random();
-    const damage = success ? Math.floor(defenderStrength * 0.1) : 0;
+    console.log('Battle result:', battleResult);
 
-    console.log('Attack result:', { success, damage });
+    // Apply losses to both attacker and defender
+    this.applyBattleLosses(attacker, battleResult.attackerLosses);
+    this.applyBattleLosses(target, battleResult.defenderLosses);
 
-    // Apply damage to target
-    if (success && damage > 0) {
-      this.applyMilitaryDamage(target, attackTypeEnum, damage);
-    }
+    // Deduct resources used in attack
+    this.deductResources(attacker, battleResult.resourcesUsed);
 
     session.updated_at = new Date().toISOString();
     console.log('Attack completed, remaining MAPs:', attacker.maps);
@@ -259,40 +255,388 @@ export class BattleSimulationEngine {
   }
 
   /**
-   * Calculate military strength for different attack types
+   * Calculate battle results using actual P&W battle mechanics
    */
-  private calculateMilitaryStrength(nation: SimulatedNation, attackType: AttackType): number {
-    switch (attackType) {
-      case AttackType.GROUND:
-        return nation.military.soldiers + (nation.military.tanks * 40);
-      case AttackType.AIR:
-        return nation.military.aircraft * 50;
-      case AttackType.NAVAL:
-        return nation.military.ships * 100;
-      default:
-        return 0;
+  private calculateBattleResult(attacker: SimulatedNation, defender: SimulatedNation, attackType: AttackType) {
+    // Only ground battles use the detailed casualty formulas provided
+    if (attackType !== AttackType.GROUND) {
+      return this.calculateNonGroundBattle(attacker, defender, attackType);
+    }
+
+    // Calculate army values for ground battle
+    const attackerArmyValue = this.calculateGroundArmyValue(attacker);
+    const defenderArmyValue = this.calculateGroundArmyValue(defender);
+    
+    console.log('Ground army values:', { attacker: attackerArmyValue, defender: defenderArmyValue });
+    
+    // Perform 3 battle rolls (0.4x to 1.0x army value)
+    const attackerRolls = this.performBattleRolls(attackerArmyValue);
+    const defenderRolls = this.performBattleRolls(defenderArmyValue);
+    
+    // Count wins for attacker
+    let attackerWins = 0;
+    for (let i = 0; i < 3; i++) {
+      if (attackerRolls[i] > defenderRolls[i]) {
+        attackerWins++;
+      }
+    }
+    
+    // Determine battle outcome
+    let outcome: 'IT' | 'MS' | 'PV' | 'UF';
+    if (attackerWins === 3) outcome = 'IT'; // Immense Triumph
+    else if (attackerWins === 2) outcome = 'MS'; // Moderate Success  
+    else if (attackerWins === 1) outcome = 'PV'; // Pyrrhic Victory
+    else outcome = 'UF'; // Utter Failure
+    
+    // Calculate losses using actual P&W formulas
+    const { attackerLosses, defenderLosses } = this.calculatePnWGroundCasualties(
+      attacker, defender, attackerArmyValue, defenderArmyValue, attackerWins >= 2
+    );
+    
+    // Calculate resource consumption
+    const resourcesUsed = this.calculateResourceConsumption(attacker, attackType);
+    
+    console.log('Battle outcome:', outcome, 'Attacker wins:', attackerWins);
+    
+    return {
+      success: attackerWins >= 2, // MS or IT considered success
+      outcome,
+      attackerWins,
+      attackerLosses,
+      defenderLosses,
+      resourcesUsed,
+      rolls: { attacker: attackerRolls, defender: defenderRolls }
+    };
+  }
+
+  /**
+   * Calculate ground army value using P&W formula: 
+   * Army Value = Unarmed Soldiers * 1 + Armed Soldiers * 1.75 + Tanks * 40
+   */
+  private calculateGroundArmyValue(nation: SimulatedNation): number {
+    const hasMunitions = nation.resources.munitions > 0;
+    const hasGasoline = nation.resources.gasoline > 0;
+    
+    let armyValue = 0;
+    
+    // Calculate soldiers with/without munitions
+    if (hasMunitions) {
+      // All soldiers can be armed with available munitions
+      const maxArmedSoldiers = Math.min(nation.military.soldiers, nation.resources.munitions * 5000);
+      const unarmedSoldiers = Math.max(0, nation.military.soldiers - maxArmedSoldiers);
+      
+      armyValue += unarmedSoldiers * 1.0;      // Unarmed soldiers
+      armyValue += maxArmedSoldiers * 1.75;    // Armed soldiers
+    } else {
+      // No munitions = all soldiers unarmed
+      armyValue += nation.military.soldiers * 1.0;
+    }
+    
+    // Tanks need both munitions AND gasoline
+    if (hasMunitions && hasGasoline) {
+      armyValue += nation.military.tanks * 40;
+    }
+    // If no resources, tanks contribute nothing (can't operate)
+    
+    return Math.max(armyValue, 1); // Minimum value of 1
+  }
+
+  /**
+   * Calculate P&W ground battle casualties using exact formulas
+   */
+  private calculatePnWGroundCasualties(
+    attacker: SimulatedNation, 
+    defender: SimulatedNation, 
+    attackerArmyValue: number,
+    defenderArmyValue: number,
+    attackerWins: boolean
+  ) {
+    // Calculate component army values for detailed casualty calculations
+    const attackerSoldierValue = this.calculateSoldierArmyValue(attacker);
+    const attackerTankValue = attacker.military.tanks * 40;
+    const defenderSoldierValue = this.calculateSoldierArmyValue(defender);
+    const defenderTankValue = defender.military.tanks * 40;
+    
+    // Generate random rolls for each component (40% to 100% of army value)
+    const ATSR = attackerSoldierValue * (0.4 + Math.random() * 0.6); // Attacking Tank Soldier Roll
+    const ATTR = attackerTankValue * (0.4 + Math.random() * 0.6);    // Attacking Tank Tank Roll
+    const DTSR = defenderSoldierValue * (0.4 + Math.random() * 0.6); // Defending Tank Soldier Roll
+    const DTTR = defenderTankValue * (0.4 + Math.random() * 0.6);    // Defending Tank Tank Roll
+    
+    console.log('Battle rolls:', { ATSR, ATTR, DTSR, DTTR, attackerWins });
+    
+    // Calculate tank casualties based on P&W formulas
+    let attackerTankCasualties = 0;
+    let defenderTankCasualties = 0;
+    
+    if (attackerWins) {
+      // Attacker wins
+      attackerTankCasualties = (DTSR * 0.0004060606) + (DTTR * 0.00066666666);
+      defenderTankCasualties = (ATSR * 0.00043225806) + (ATTR * 0.00070967741);
+    } else {
+      // Defender wins
+      attackerTankCasualties = (DTSR * 0.00043225806) + (DTTR * 0.00070967741);
+      defenderTankCasualties = (ATSR * 0.0004060606) + (ATTR * 0.00066666666);
+    }
+    
+    // Calculate soldier casualties (same formula regardless of winner)
+    const attackerSoldierCasualties = (DTSR * 0.0084) + (DTTR * 0.0092);
+    const defenderSoldierCasualties = (ATSR * 0.0084) + (ATTR * 0.0092);
+    
+    // Apply casualties with bounds checking
+    const attackerLosses = {
+      soldiers: Math.min(Math.floor(attackerSoldierCasualties), attacker.military.soldiers),
+      tanks: Math.min(Math.floor(attackerTankCasualties), attacker.military.tanks)
+    };
+    
+    const defenderLosses = {
+      soldiers: Math.min(Math.floor(defenderSoldierCasualties), defender.military.soldiers),
+      tanks: Math.min(Math.floor(defenderTankCasualties), defender.military.tanks)
+    };
+    
+    console.log('Calculated casualties:', { attackerLosses, defenderLosses });
+    
+    return { attackerLosses, defenderLosses };
+  }
+
+  /**
+   * Calculate soldier army value component
+   */
+  private calculateSoldierArmyValue(nation: SimulatedNation): number {
+    const hasMunitions = nation.resources.munitions > 0;
+    
+    if (hasMunitions) {
+      const maxArmedSoldiers = Math.min(nation.military.soldiers, nation.resources.munitions * 5000);
+      const unarmedSoldiers = Math.max(0, nation.military.soldiers - maxArmedSoldiers);
+      return (unarmedSoldiers * 1.0) + (maxArmedSoldiers * 1.75);
+    } else {
+      return nation.military.soldiers * 1.0;
     }
   }
 
   /**
-   * Apply military damage to a nation
+   * Handle non-ground battles with simplified mechanics
    */
-  private applyMilitaryDamage(nation: SimulatedNation, attackType: AttackType, damage: number): void {
+  private calculateNonGroundBattle(attacker: SimulatedNation, defender: SimulatedNation, attackType: AttackType) {
+    // Use simplified army value calculation for air/naval
+    const attackerArmyValue = this.calculateAirNavalArmyValue(attacker, attackType);
+    const defenderArmyValue = this.calculateAirNavalArmyValue(defender, attackType);
+    
+    const attackerRolls = this.performBattleRolls(attackerArmyValue);
+    const defenderRolls = this.performBattleRolls(defenderArmyValue);
+    
+    let attackerWins = 0;
+    for (let i = 0; i < 3; i++) {
+      if (attackerRolls[i] > defenderRolls[i]) {
+        attackerWins++;
+      }
+    }
+    
+    let outcome: 'IT' | 'MS' | 'PV' | 'UF';
+    if (attackerWins === 3) outcome = 'IT';
+    else if (attackerWins === 2) outcome = 'MS';
+    else if (attackerWins === 1) outcome = 'PV';
+    else outcome = 'UF';
+    
+    // Use simplified casualties for air/naval battles
+    const { attackerLosses, defenderLosses } = this.calculateBattleLosses(
+      attacker, defender, attackType, outcome
+    );
+    
+    const resourcesUsed = this.calculateResourceConsumption(attacker, attackType);
+    
+    return {
+      success: attackerWins >= 2,
+      outcome,
+      attackerWins,
+      attackerLosses,
+      defenderLosses,
+      resourcesUsed,
+      rolls: { attacker: attackerRolls, defender: defenderRolls }
+    };
+  }
+
+  /**
+   * Calculate army value for air/naval battles
+   */
+  private calculateAirNavalArmyValue(nation: SimulatedNation, attackType: AttackType): number {
+    const hasMunitions = nation.resources.munitions > 0;
+    const hasGasoline = nation.resources.gasoline > 0;
+    
+    let armyValue = 0;
+    
     switch (attackType) {
-      case AttackType.GROUND:
-        const soldierLoss = Math.min(damage, nation.military.soldiers);
-        nation.military.soldiers -= soldierLoss;
-        break;
       case AttackType.AIR:
-        const aircraftLoss = Math.min(Math.floor(damage / 50), nation.military.aircraft);
-        nation.military.aircraft -= aircraftLoss;
+        // Planes need munitions and gasoline
+        if (hasMunitions && hasGasoline) {
+          armyValue += nation.military.aircraft * 200;
+        } else {
+          armyValue += nation.military.aircraft * 20;
+        }
         break;
+        
       case AttackType.NAVAL:
-        const shipLoss = Math.min(Math.floor(damage / 100), nation.military.ships);
-        nation.military.ships -= shipLoss;
+        // Ships need munitions and gasoline
+        if (hasMunitions && hasGasoline) {
+          armyValue += nation.military.ships * 150;
+        } else {
+          armyValue += nation.military.ships * 15;
+        }
         break;
     }
+    
+    return Math.max(armyValue, 1);
   }
+
+  /**
+   * Perform 3 battle rolls (0.4x to 1.0x army value)
+   */
+  private performBattleRolls(armyValue: number): number[] {
+    const rolls: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      const rollMultiplier = 0.4 + (Math.random() * 0.6); // 0.4 to 1.0
+      rolls.push(armyValue * rollMultiplier);
+    }
+    return rolls;
+  }
+
+  /**
+   * Calculate battle losses based on outcome and P&W mechanics
+   */
+  private calculateBattleLosses(
+    attacker: SimulatedNation, 
+    defender: SimulatedNation, 
+    attackType: AttackType, 
+    outcome: 'IT' | 'MS' | 'PV' | 'UF'
+  ) {
+    // Base casualty rates based on outcome
+    let attackerCasualtyRate: number;
+    let defenderCasualtyRate: number;
+    
+    switch (outcome) {
+      case 'IT': // Immense Triumph
+        attackerCasualtyRate = 0.01 + (Math.random() * 0.02); // 1-3%
+        defenderCasualtyRate = 0.08 + (Math.random() * 0.12); // 8-20%
+        break;
+      case 'MS': // Moderate Success
+        attackerCasualtyRate = 0.02 + (Math.random() * 0.03); // 2-5%
+        defenderCasualtyRate = 0.05 + (Math.random() * 0.08); // 5-13%
+        break;
+      case 'PV': // Pyrrhic Victory
+        attackerCasualtyRate = 0.04 + (Math.random() * 0.06); // 4-10%
+        defenderCasualtyRate = 0.03 + (Math.random() * 0.05); // 3-8%
+        break;
+      case 'UF': // Utter Failure
+        attackerCasualtyRate = 0.08 + (Math.random() * 0.15); // 8-23%
+        defenderCasualtyRate = 0.01 + (Math.random() * 0.02); // 1-3%
+        break;
+    }
+    
+    const attackerLosses = this.calculateSpecificUnitLosses(attacker, attackType, attackerCasualtyRate);
+    const defenderLosses = this.calculateSpecificUnitLosses(defender, attackType, defenderCasualtyRate);
+    
+    return { attackerLosses, defenderLosses };
+  }
+
+  /**
+   * Calculate specific unit losses based on attack type and casualty rate
+   */
+  private calculateSpecificUnitLosses(nation: SimulatedNation, attackType: AttackType, casualtyRate: number): Partial<MilitaryBuild> {
+    const losses: Partial<MilitaryBuild> = {};
+    
+    switch (attackType) {
+      case AttackType.GROUND:
+        // Ground battles target soldiers and tanks primarily
+        losses.soldiers = Math.floor(nation.military.soldiers * casualtyRate * (0.8 + Math.random() * 0.4));
+        losses.tanks = Math.floor(nation.military.tanks * casualtyRate * (0.6 + Math.random() * 0.4));
+        break;
+        
+      case AttackType.AIR:
+        // Air battles target aircraft first, then can target ground units
+        losses.aircraft = Math.floor(nation.military.aircraft * casualtyRate);
+        // If air superiority, can target ground units too
+        if (casualtyRate > 0.05) { // Significant defeat
+          losses.soldiers = Math.floor(nation.military.soldiers * casualtyRate * 0.2);
+          losses.tanks = Math.floor(nation.military.tanks * casualtyRate * 0.1);
+        }
+        break;
+        
+      case AttackType.NAVAL:
+        // Naval battles target ships primarily
+        losses.ships = Math.floor(nation.military.ships * casualtyRate);
+        // Some coastal defenses might be affected
+        losses.soldiers = Math.floor(nation.military.soldiers * casualtyRate * 0.1);
+        break;
+    }
+    
+    return losses;
+  }
+
+  /**
+   * Calculate resource consumption based on P&W mechanics
+   */
+  private calculateResourceConsumption(attacker: SimulatedNation, attackType: AttackType): { munitions: number; gasoline: number } {
+    let munitions = 0;
+    let gasoline = 0;
+    
+    switch (attackType) {
+      case AttackType.GROUND:
+        // Soldiers with munitions: 5,000 soldiers = 1 munition unit
+        const soldiersWithMunitions = Math.min(attacker.military.soldiers, attacker.resources.munitions * 5000);
+        munitions += Math.ceil(soldiersWithMunitions / 5000);
+        
+        // Tanks: 100 tanks = 1 munition + 1 gasoline
+        const tanksInBattle = Math.min(attacker.military.tanks, Math.min(attacker.resources.munitions * 100, attacker.resources.gasoline * 100));
+        munitions += Math.ceil(tanksInBattle / 100);
+        gasoline += Math.ceil(tanksInBattle / 100);
+        break;
+        
+      case AttackType.AIR:
+        // Each plane uses 0.25 gas + 0.25 munitions per attack
+        const planesInBattle = Math.min(attacker.military.aircraft, Math.min(attacker.resources.munitions * 4, attacker.resources.gasoline * 4));
+        munitions += Math.ceil(planesInBattle * 0.25);
+        gasoline += Math.ceil(planesInBattle * 0.25);
+        break;
+        
+      case AttackType.NAVAL:
+        // Each ship uses 1.75 munitions + 1 gasoline per attack
+        const shipsInBattle = Math.min(attacker.military.ships, Math.min(attacker.resources.munitions / 1.75, attacker.resources.gasoline));
+        munitions += Math.ceil(shipsInBattle * 1.75);
+        gasoline += Math.ceil(shipsInBattle * 1);
+        break;
+    }
+    
+    return { munitions, gasoline };
+  }
+
+  /**
+   * Apply battle losses to a nation's military
+   */
+  private applyBattleLosses(nation: SimulatedNation, losses: Partial<MilitaryBuild>): void {
+    if (losses.soldiers) {
+      nation.military.soldiers = Math.max(0, nation.military.soldiers - losses.soldiers);
+    }
+    if (losses.tanks) {
+      nation.military.tanks = Math.max(0, nation.military.tanks - losses.tanks);
+    }
+    if (losses.aircraft) {
+      nation.military.aircraft = Math.max(0, nation.military.aircraft - losses.aircraft);
+    }
+    if (losses.ships) {
+      nation.military.ships = Math.max(0, nation.military.ships - losses.ships);
+    }
+  }
+
+  /**
+   * Deduct resources from nation
+   */
+  private deductResources(nation: SimulatedNation, resourcesUsed: { munitions: number; gasoline: number }): void {
+    nation.resources.munitions = Math.max(0, nation.resources.munitions - resourcesUsed.munitions);
+    nation.resources.gasoline = Math.max(0, nation.resources.gasoline - resourcesUsed.gasoline);
+  }
+
+
+
 
   /**
    * Calculate recruitment capacity based on city builds
@@ -340,7 +684,7 @@ export class BattleSimulationEngine {
     }
 
     // Deduct resources and add units
-    this.deductResources(nation, cost);
+    this.deductMoney(nation, cost);
     nation.military[unitType as keyof MilitaryBuild] += amount;
 
     session.updated_at = new Date().toISOString();
@@ -382,7 +726,7 @@ export class BattleSimulationEngine {
     const cost = this.calculatePurchaseCost(type, item, amount);
     
     if (this.canAfford(nation, cost)) {
-      this.deductResources(nation, cost);
+      this.deductMoney(nation, cost);
       this.addToCity(city, type, item, amount);
       session.updated_at = new Date().toISOString();
       return true;
@@ -540,7 +884,7 @@ export class BattleSimulationEngine {
     return nation.resources.money >= (cost.money || 0);
   }
 
-  private deductResources(nation: SimulatedNation, cost: any): void {
+  private deductMoney(nation: SimulatedNation, cost: any): void {
     nation.resources.money -= (cost.money || 0);
   }
 
