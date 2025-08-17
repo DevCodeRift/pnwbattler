@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import Pusher from 'pusher-js';
@@ -39,6 +39,7 @@ function RealBattleContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [pusherClient, setPusherClient] = useState<Pusher | null>(null);
+  const pusherRef = useRef<Pusher | null>(null);
 
   // Form state for creating lobby
   const [hostName, setHostName] = useState(session?.user?.name || '');
@@ -63,6 +64,7 @@ function RealBattleContent() {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
     });
     setPusherClient(pusher);
+    pusherRef.current = pusher;
 
     // Subscribe to multiplayer channel for lobby updates
     const multiplayerChannel = pusher.subscribe('multiplayer');
@@ -210,29 +212,49 @@ function RealBattleContent() {
   };
 
   const subscribeToLobbyEvents = (lobbyId: string) => {
-    if (!pusherClient) {
+    const pusher = pusherRef.current || pusherClient;
+    if (!pusher) {
       console.log('No pusher client available for lobby events');
       return;
     }
     
     console.log('Subscribing to lobby events for lobby:', lobbyId);
-    const lobbyChannel = pusherClient.subscribe(`lobby-${lobbyId}`);
+    const lobbyChannel = pusher.subscribe(`lobby-${lobbyId}`);
     
     lobbyChannel.bind('player-joined', (eventData: any) => {
-      console.log('Player joined lobby:', eventData);
+      console.log('Player joined lobby event received:', eventData);
       setCurrentLobby((prev: any) => {
+        console.log('Current lobby state before update:', prev);
+        console.log('Lobby ID match check:', { 
+          eventLobbyId: eventData.lobbyId, 
+          currentLobbyId: prev?.id, 
+          subscribedLobbyId: lobbyId 
+        });
+        
         // If we have the full lobby data, use it
         if (eventData.lobby) {
+          console.log('Using full lobby data from event:', eventData.lobby);
           return eventData.lobby;
         }
+        
         // Fallback: update the current lobby if it matches
         if (prev && (prev.id === eventData.lobbyId || prev.id === lobbyId)) {
-          return {
+          const updatedLobby = {
             ...prev,
             players: eventData.player ? [...prev.players, eventData.player] : prev.players,
             playerCount: eventData.player ? prev.playerCount + 1 : prev.playerCount
           };
+          console.log('Updated lobby with fallback logic:', updatedLobby);
+          return updatedLobby;
         }
+        
+        // If no current lobby but we have event data for the right lobby
+        if (!prev && eventData.lobbyId === lobbyId && eventData.lobby) {
+          console.log('Setting lobby from event when no current lobby:', eventData.lobby);
+          return eventData.lobby;
+        }
+        
+        console.log('No lobby update needed, returning previous state');
         return prev;
       });
     });
@@ -482,6 +504,12 @@ function RealBattleContent() {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <div className="container mx-auto px-4 py-8">
+        {/* Debug Panel */}
+        <div className="bg-purple-800 rounded p-2 mb-4 text-sm">
+          <p>Debug State - GameState: {gameState} | Has Lobby: {!!currentLobby} | Session: {session?.user?.name}</p>
+          {currentLobby && <p>Current Lobby: ID={currentLobby.id}, Players={currentLobby.playerCount}</p>}
+        </div>
+
         {/* Error Display */}
         {error && (
           <div className="bg-red-600 text-white p-4 rounded-lg mb-6">
@@ -703,6 +731,11 @@ function RealBattleContent() {
         {gameState === 'lobby' && currentLobby && (
           <div>
             <h1 className="text-3xl font-bold mb-8">Lobby: {currentLobby.hostName}&apos;s Game</h1>
+            {/* Debug info */}
+            <div className="bg-blue-800 rounded p-2 mb-4 text-sm">
+              <p>Debug - GameState: {gameState} | Lobby ID: {currentLobby.id} | Player Count: {currentLobby.playerCount}</p>
+              <p>Debug - Players: {JSON.stringify(currentLobby.players?.map((p: any) => ({ name: p.name, isHost: p.isHost, isReady: p.isReady })))}</p>
+            </div>
             <div className="bg-gray-800 rounded-lg p-6">
               <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-2">Players ({currentLobby.playerCount}/{settings.maxPlayers})</h3>
