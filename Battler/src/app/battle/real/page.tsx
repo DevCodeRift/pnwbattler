@@ -89,6 +89,11 @@ function RealBattleContent() {
       setBattles(prev => [data, ...prev]);
     });
 
+    // Check if user is already in a lobby
+    if (session?.user) {
+      checkForExistingLobby();
+    }
+
     // Load initial data
     loadActiveGames();
     loadOnlineUsers();
@@ -178,6 +183,87 @@ function RealBattleContent() {
     }
   };
 
+  const checkForExistingLobby = async () => {
+    try {
+      const response = await fetch('/api/multiplayer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get-my-lobby'
+        })
+      });
+
+      const data = await response.json();
+      if (data.lobby) {
+        console.log('Found existing lobby, rejoining:', data.lobby);
+        setCurrentLobby(data.lobby);
+        setGameState('lobby');
+        
+        // Subscribe to lobby-specific events
+        if (pusherClient) {
+          subscribeToLobbyEvents(data.lobby.id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check for existing lobby:', error);
+    }
+  };
+
+  const subscribeToLobbyEvents = (lobbyId: string) => {
+    if (!pusherClient) return;
+    
+    const lobbyChannel = pusherClient.subscribe(`lobby-${lobbyId}`);
+    
+    lobbyChannel.bind('player-joined', (eventData: any) => {
+      console.log('Player joined lobby:', eventData);
+      setCurrentLobby((prev: any) => {
+        if (prev && prev.id === eventData.lobbyId) {
+          return eventData.lobby || {
+            ...prev,
+            players: [...prev.players, eventData.player]
+          };
+        }
+        return prev;
+      });
+    });
+
+    lobbyChannel.bind('player-left', (eventData: any) => {
+      console.log('Player left lobby:', eventData);
+      setCurrentLobby((prev: any) => {
+        if (prev && prev.id === eventData.lobbyId) {
+          return eventData.lobby || {
+            ...prev,
+            players: prev.players.filter((p: any) => p.id !== eventData.playerId)
+          };
+        }
+        return prev;
+      });
+    });
+
+    lobbyChannel.bind('player-ready-changed', (eventData: any) => {
+      console.log('Player ready status changed:', eventData);
+      setCurrentLobby((prev: any) => {
+        if (prev && prev.id === eventData.lobby.id) {
+          return eventData.lobby;
+        }
+        return prev;
+      });
+    });
+
+    lobbyChannel.bind('battle-started', (eventData: any) => {
+      console.log('Battle started in lobby:', eventData);
+      setBattle(eventData.battle);
+      setGameState('battle');
+    });
+
+    lobbyChannel.bind('lobby-closed', (eventData: any) => {
+      console.log('Lobby was closed:', eventData);
+      setCurrentLobby(null);
+      setGameState('setup');
+      setError(eventData.message || 'Lobby was closed');
+    });
+  };
+
   const createLobby = async () => {
     if (!hostName.trim()) {
       setError('Please enter a host name');
@@ -205,41 +291,7 @@ function RealBattleContent() {
         setGameState('lobby');
         
         // Subscribe to lobby-specific events
-        if (pusherClient) {
-          const lobbyChannel = pusherClient.subscribe(`lobby-${data.lobby.id}`);
-          
-          lobbyChannel.bind('player-joined', (eventData: any) => {
-            console.log('Player joined lobby:', eventData);
-            setCurrentLobby((prev: any) => {
-              if (prev && prev.id === eventData.lobbyId) {
-                return {
-                  ...prev,
-                  players: [...prev.players, eventData.player]
-                };
-              }
-              return prev;
-            });
-          });
-
-          lobbyChannel.bind('player-left', (eventData: any) => {
-            console.log('Player left lobby:', eventData);
-            setCurrentLobby((prev: any) => {
-              if (prev && prev.id === eventData.lobbyId) {
-                return {
-                  ...prev,
-                  players: prev.players.filter((p: any) => p.id !== eventData.playerId)
-                };
-              }
-              return prev;
-            });
-          });
-
-          lobbyChannel.bind('battle-started', (eventData: any) => {
-            console.log('Battle started in lobby:', eventData);
-            setBattle(eventData.battle);
-            setGameState('battle');
-          });
-        }
+        subscribeToLobbyEvents(data.lobby.id);
         
         await loadActiveGames(); // Refresh the lobby list
       } else {
@@ -280,40 +332,10 @@ function RealBattleContent() {
         setGameState('lobby');
         
         // Subscribe to lobby-specific events
-        if (pusherClient) {
-          const lobbyChannel = pusherClient.subscribe(`lobby-${data.lobby.id}`);
-          
-          lobbyChannel.bind('player-joined', (eventData: any) => {
-            console.log('Player joined lobby:', eventData);
-            setCurrentLobby((prev: any) => {
-              if (prev && prev.id === eventData.lobbyId) {
-                return {
-                  ...prev,
-                  players: [...prev.players, eventData.player]
-                };
-              }
-              return prev;
-            });
-          });
-
-          lobbyChannel.bind('player-left', (eventData: any) => {
-            console.log('Player left lobby:', eventData);
-            setCurrentLobby((prev: any) => {
-              if (prev && prev.id === eventData.lobbyId) {
-                return {
-                  ...prev,
-                  players: prev.players.filter((p: any) => p.id !== eventData.playerId)
-                };
-              }
-              return prev;
-            });
-          });
-
-          lobbyChannel.bind('battle-started', (eventData: any) => {
-            console.log('Battle started in lobby:', eventData);
-            setBattle(eventData.battle);
-            setGameState('battle');
-          });
+        subscribeToLobbyEvents(data.lobby.id);
+        
+        if (data.rejoined) {
+          console.log('Successfully rejoined lobby');
         }
         
         await loadActiveGames();
@@ -376,6 +398,38 @@ function RealBattleContent() {
     } catch (error) {
       setError('Network error while starting battle');
       console.error('Start battle error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleReady = async () => {
+    if (!currentLobby) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/multiplayer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'toggle-ready',
+          lobbyId: currentLobby.id
+        })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && data.lobby) {
+        setCurrentLobby(data.lobby);
+        console.log(`Ready status toggled to: ${data.isReady}`);
+      } else {
+        setError(data.error || 'Failed to toggle ready status');
+      }
+    } catch (error) {
+      setError('Network error while toggling ready status');
+      console.error('Toggle ready error:', error);
     } finally {
       setLoading(false);
     }
@@ -630,13 +684,32 @@ function RealBattleContent() {
             <div className="bg-gray-800 rounded-lg p-6">
               <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-2">Players ({currentLobby.playerCount}/{settings.maxPlayers})</h3>
-                <div className="bg-gray-700 rounded p-4">
-                  <p className="text-gray-300">Host: {currentLobby.hostName}</p>
-                  {currentLobby.playerCount > 1 && (
-                    <p className="text-gray-300">Player 2: Joined</p>
-                  )}
+                <div className="space-y-2">
+                  {currentLobby.players?.map((player: any) => (
+                    <div key={player.id} className="bg-gray-700 rounded p-4 flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <span className="font-medium">{player.name}</span>
+                        {player.isHost && (
+                          <span className="bg-yellow-600 text-xs px-2 py-1 rounded">HOST</span>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {player.isReady ? (
+                          <span className="bg-green-600 text-xs px-2 py-1 rounded flex items-center">
+                            ✓ Ready
+                          </span>
+                        ) : (
+                          <span className="bg-red-600 text-xs px-2 py-1 rounded">
+                            Not Ready
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                   {currentLobby.playerCount < settings.maxPlayers && (
-                    <p className="text-yellow-300">Waiting for more players...</p>
+                    <div className="bg-gray-700 rounded p-4 text-yellow-300">
+                      Waiting for more players...
+                    </div>
                   )}
                 </div>
               </div>
@@ -651,24 +724,55 @@ function RealBattleContent() {
                 </div>
               </div>
 
-              <div className="flex gap-4">
+              {/* Ready Toggle for Current Player */}
+              <div className="mb-6">
                 <button
-                  onClick={startBattle}
-                  disabled={loading || currentLobby.playerCount < 2}
-                  className="bg-green-600 hover:bg-green-700 disabled:opacity-50 px-6 py-3 rounded-lg font-semibold"
+                  onClick={toggleReady}
+                  disabled={loading}
+                  className={`px-6 py-3 rounded-lg font-semibold ${
+                    currentLobby.players?.find((p: any) => p.name === session?.user?.name)?.isReady
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-green-600 hover:bg-green-700'
+                  } disabled:opacity-50`}
                 >
-                  {loading ? 'Starting...' : 'Start Battle'}
+                  {loading ? 'Updating...' : 
+                   currentLobby.players?.find((p: any) => p.name === session?.user?.name)?.isReady
+                     ? 'Cancel Ready'
+                     : 'Ready Up!'
+                  }
                 </button>
+              </div>
+
+              <div className="flex gap-4">
+                {/* Only host can start battle and only when all players are ready */}
+                {currentLobby.players?.find((p: any) => p.name === session?.user?.name)?.isHost && (
+                  <button
+                    onClick={startBattle}
+                    disabled={loading || currentLobby.playerCount < 2 || !currentLobby.players?.every((p: any) => p.isReady)}
+                    className="bg-green-600 hover:bg-green-700 disabled:opacity-50 px-6 py-3 rounded-lg font-semibold"
+                  >
+                    {loading ? 'Starting...' : 'Start Battle'}
+                  </button>
+                )}
                 <button
                   onClick={() => setGameState('setup')}
                   className="bg-gray-600 hover:bg-gray-700 px-6 py-3 rounded-lg font-semibold"
                 >
-                  Back to Setup
+                  Leave Lobby
                 </button>
               </div>
 
+              {/* Status Messages */}
               {currentLobby.playerCount < 2 && (
                 <p className="text-yellow-300 mt-4">Need at least 2 players to start the battle</p>
+              )}
+              {currentLobby.playerCount >= 2 && !currentLobby.players?.every((p: any) => p.isReady) && (
+                <p className="text-yellow-300 mt-4">
+                  Waiting for all players to ready up: {currentLobby.players?.filter((p: any) => !p.isReady).map((p: any) => p.name).join(', ')}
+                </p>
+              )}
+              {currentLobby.playerCount >= 2 && currentLobby.players?.every((p: any) => p.isReady) && (
+                <p className="text-green-300 mt-4">✓ All players ready! Host can start the battle.</p>
               )}
             </div>
           </div>

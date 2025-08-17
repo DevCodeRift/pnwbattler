@@ -25,7 +25,9 @@ model Lobby {
 model Player {
   id        String   @id @default(cuid())
   name      String
+  discordId String?  // Link to user's Discord ID for session tracking
   isHost    Boolean  @default(false)
+  isReady   Boolean  @default(false)  // Ready status for battle start
   lobbyId   String
   createdAt DateTime @default(now())
   lobby     Lobby    @relation(fields: [lobbyId], references: [id], onDelete: Cascade)

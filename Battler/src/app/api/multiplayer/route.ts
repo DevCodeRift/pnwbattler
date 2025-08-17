@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import Pusher from 'pusher';
 import { prisma } from '../../../lib/prisma';
 import { cleanupInactiveLobbies, updateLobbyActivity } from '../../../lib/lobby-cleanup';
@@ -111,6 +113,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const discordId = (session.user as any).discordId;
+    const userName = (session.user as any).username || session.user.name || 'Unknown';
+
     const body = await request.json();
     const { action, ...data } = body;
 
@@ -120,19 +134,21 @@ export async function POST(request: NextRequest) {
         
         const lobby = await prisma.lobby.create({
           data: {
-            host: hostName, // User identifier
-            hostName,       // Display name
+            host: discordId || hostName, // Use Discord ID as identifier
+            hostName: hostName || userName,
             settings,
             status: 'WAITING',
           },
         });
 
-        // Add host as a player
+        // Add host as a player with Discord ID
         await prisma.player.create({
           data: {
-            name: hostName,
+            name: hostName || userName,
+            discordId: discordId,
             lobbyId: lobby.id,
             isHost: true,
+            isReady: false,
           },
         });
 
@@ -179,11 +195,38 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Lobby is not accepting new players' }, { status: 400 });
         }
 
+        // Check if user is already in this lobby
+        const existingPlayer = lobby.players.find((player: any) => player.discordId === discordId);
+        if (existingPlayer) {
+          // User is already in lobby, just return the current state
+          const formattedLobby = {
+            id: lobby.id,
+            hostName: lobby.hostName,
+            playerCount: lobby.players.length,
+            spectatorCount: lobby.spectators.length,
+            status: lobby.status,
+            settings: lobby.settings,
+            createdAt: lobby.createdAt.toISOString(),
+            players: lobby.players.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              isHost: p.isHost,
+              isReady: p.isReady
+            }))
+          };
+
+          return NextResponse.json({ 
+            lobby: formattedLobby,
+            rejoined: true,
+            message: 'Rejoined existing lobby'
+          });
+        }
+
         if (asSpectator) {
           // Add as spectator
           await prisma.spectator.create({
             data: {
-              name: playerName,
+              name: playerName || userName,
               lobbyId,
             },
           });
@@ -193,12 +236,14 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Lobby is full' }, { status: 400 });
           }
 
-          // Add as player
+          // Add as player with Discord ID
           await prisma.player.create({
             data: {
-              name: playerName,
+              name: playerName || userName,
+              discordId: discordId,
               lobbyId,
               isHost: false,
+              isReady: false,
             },
           });
         }
@@ -223,6 +268,12 @@ export async function POST(request: NextRequest) {
           status: updatedLobby!.status,
           settings: updatedLobby!.settings,
           createdAt: updatedLobby!.createdAt.toISOString(),
+          players: updatedLobby!.players.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            isHost: p.isHost,
+            isReady: p.isReady
+          }))
         };
 
         // Broadcast lobby update
@@ -234,6 +285,121 @@ export async function POST(request: NextRequest) {
         });
 
         return NextResponse.json({ lobby: formattedLobby });
+      }
+
+      case 'toggle-ready': {
+        const { lobbyId } = data;
+        
+        // Find the player in the lobby
+        const lobby = await prisma.lobby.findUnique({
+          where: { id: lobbyId },
+          include: {
+            players: true,
+            spectators: true,
+          },
+        });
+
+        if (!lobby) {
+          return NextResponse.json({ error: 'Lobby not found' }, { status: 404 });
+        }
+
+        const player = lobby.players.find((p: any) => p.discordId === discordId);
+        if (!player) {
+          return NextResponse.json({ error: 'You are not a player in this lobby' }, { status: 400 });
+        }
+
+        // Toggle ready status
+        await prisma.player.update({
+          where: { id: player.id },
+          data: { isReady: !player.isReady }
+        });
+
+        // Update lobby activity
+        await updateLobbyActivity(lobbyId);
+
+        // Get updated lobby
+        const updatedLobby = await prisma.lobby.findUnique({
+          where: { id: lobbyId },
+          include: {
+            players: true,
+            spectators: true,
+          },
+        });
+
+        const formattedLobby = {
+          id: updatedLobby!.id,
+          hostName: updatedLobby!.hostName,
+          playerCount: updatedLobby!.players.length,
+          spectatorCount: updatedLobby!.spectators.length,
+          status: updatedLobby!.status,
+          settings: updatedLobby!.settings,
+          createdAt: updatedLobby!.createdAt.toISOString(),
+          players: updatedLobby!.players.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            isHost: p.isHost,
+            isReady: p.isReady
+          }))
+        };
+
+        // Broadcast ready status change
+        await pusher.trigger('multiplayer', 'lobby-updated', formattedLobby);
+        await pusher.trigger(`lobby-${lobbyId}`, 'player-ready-changed', {
+          playerId: player.id,
+          playerName: player.name,
+          isReady: !player.isReady,
+          lobby: formattedLobby,
+        });
+
+        return NextResponse.json({ 
+          lobby: formattedLobby,
+          isReady: !player.isReady
+        });
+      }
+
+      case 'get-my-lobby': {
+        // Find any lobby the user is currently in
+        const userLobby = await prisma.lobby.findFirst({
+          where: {
+            players: {
+              some: {
+                discordId: discordId
+              }
+            },
+            status: {
+              in: ['WAITING', 'IN_PROGRESS']
+            }
+          },
+          include: {
+            players: true,
+            spectators: true,
+          }
+        });
+
+        if (!userLobby) {
+          return NextResponse.json({ lobby: null });
+        }
+
+        const formattedLobby = {
+          id: userLobby.id,
+          hostName: userLobby.hostName,
+          playerCount: userLobby.players.length,
+          spectatorCount: userLobby.spectators.length,
+          status: userLobby.status,
+          settings: userLobby.settings,
+          createdAt: userLobby.createdAt.toISOString(),
+          players: userLobby.players.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            isHost: p.isHost,
+            isReady: p.isReady
+          }))
+        };
+
+        return NextResponse.json({ 
+          lobby: formattedLobby,
+          rejoined: true 
+        });
       }
 
       case 'start-battle': {
@@ -253,6 +419,15 @@ export async function POST(request: NextRequest) {
 
         if (lobby.players.length < 2) {
           return NextResponse.json({ error: 'Need 2 players to start battle' }, { status: 400 });
+        }
+
+        // Check if all players are ready
+        const allPlayersReady = lobby.players.every((player: any) => player.isReady);
+        if (!allPlayersReady) {
+          const notReadyPlayers = lobby.players.filter((player: any) => !player.isReady).map((player: any) => player.name);
+          return NextResponse.json({ 
+            error: `Not all players are ready. Waiting for: ${notReadyPlayers.join(', ')}` 
+          }, { status: 400 });
         }
 
         // Update lobby activity before starting battle
