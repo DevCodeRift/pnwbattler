@@ -8,6 +8,10 @@ export default function RealNationBattlePage() {
   const [battleSession, setBattleSession] = useState<BattleSession | null>(null);
   const [attackingNationId, setAttackingNationId] = useState('');
   const [defendingNationId, setDefendingNationId] = useState('');
+  const [nations, setNations] = useState<{ attacking: SimulatedNation | null; defending: SimulatedNation | null }>({
+    attacking: null,
+    defending: null
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [timeRemaining, setTimeRemaining] = useState(30);
@@ -235,47 +239,92 @@ export default function RealNationBattlePage() {
       const attacker = convertToSimulatedNation(attackerData, attackingNationId);
       const defender = convertToSimulatedNation(defenderData, defendingNationId);
 
-      // Create battle session
-      const newSession: BattleSession = {
-        id: `battle_${Date.now()}`,
-        mode: 'ai' as any,
-        participants: [attacker, defender],
-        currentTurn: 1,
-        turnTimer: 30,
-        isActive: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        settings: {
-          battleMode: 'ai' as any,
-          turnCooldown: 30,
-          turnsUntilRecruitment: 1,
-          militarizationLevel: MilitarizationLevel.CUSTOM,
-          economySettings: {
-            mode: EconomyMode.UNLIMITED,
-            resources: {
-              money: 999999999,
-              oil: 999999999,
-              food: 999999999,
-              steel: 999999999,
-              aluminum: 999999999,
-              gasoline: 999999999,
-              munitions: 999999999,
-              uranium: 999999999,
-              coal: 999999999,
-              iron: 999999999,
-              bauxite: 999999999,
-              lead: 999999999
-            }
-          },
-          spyOperationsEnabled: false,
-          isPrivate: false
-        }
-      };
+      // Store nations in state for display
+      setNations({ attacking: attacker, defending: defender });
 
-      setBattleSession(newSession);
-      setTimeRemaining(30);
+      // Create battle session with attacker as host
+      const createResponse = await fetch('/api/battle-simulation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'createSession',
+          settings: {
+            economySettings: 'BALANCED',
+            militarizationLevel: 'STANDARD',
+            simulationMode: 'REALISTIC'
+          },
+          hostNation: attacker
+        }),
+      });
+
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json();
+        throw new Error(errorData.error || 'Failed to create battle session');
+      }
+
+      const createData = await createResponse.json();
+      
+      if (!createData.success || !createData.session) {
+        throw new Error('Invalid response format');
+      }
+
+      const sessionId = createData.session.id;
+
+      // Join defender to the session
+      const joinResponse = await fetch('/api/battle-simulation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'joinSession',
+          sessionId: sessionId,
+          nation: defender
+        }),
+      });
+
+      if (!joinResponse.ok) {
+        const errorData = await joinResponse.json();
+        throw new Error(errorData.error || 'Failed to join defender to session');
+      }
+
+      const joinData = await joinResponse.json();
+      
+      if (!joinData.success) {
+        throw new Error('Failed to join defender to session');
+      }
+
+      // Get the updated session with both participants
+      const sessionResponse = await fetch('/api/battle-simulation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'getSession',
+          sessionId: sessionId
+        }),
+      });
+
+      if (!sessionResponse.ok) {
+        const errorData = await sessionResponse.json();
+        throw new Error(errorData.error || 'Failed to get updated session');
+      }
+
+      const sessionData = await sessionResponse.json();
+      
+      if (sessionData.session) {
+        setBattleSession(sessionData.session);
+        setTimeRemaining(30);
+      } else {
+        throw new Error('Invalid session response format');
+      }
+
     } catch (error: any) {
       setError(`Error creating battle: ${error.message}`);
+      console.error('Battle creation error:', error);
     } finally {
       setLoading(false);
     }
