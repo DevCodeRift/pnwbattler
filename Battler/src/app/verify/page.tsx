@@ -290,7 +290,7 @@ export default function VerifyPage() {
                   A verification code has been sent to your Politics & War inbox. Please enter it below to complete verification.
                 </p>
                 <p className="text-blue-200 text-sm mt-2">
-                  <strong>Tip:</strong> If you don't receive the code, you can click "Resend Code" to get a new one.
+                  <strong>Tip:</strong> If you don&apos;t receive the code, you can click &quot;Resend Code&quot; to get a new one.
                 </p>
                 {generatedCode && (
                   <div className="mt-3 p-3 bg-yellow-900/30 border border-yellow-600/30 rounded">
