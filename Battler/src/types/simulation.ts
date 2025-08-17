@@ -2,7 +2,8 @@
 export enum BattleMode {
   AI = 'ai',
   OPEN_LOBBY = 'open_lobby',
-  PRIVATE_INVITE = 'private_invite'
+  PRIVATE_INVITE = 'private_invite',
+  MULTIPLAYER = 'multiplayer'
 }
 
 export enum EconomyMode {
@@ -16,6 +17,31 @@ export enum MilitarizationLevel {
   PARTIAL = 'partial',
   MAXED = 'maxed',
   CUSTOM = 'custom'
+}
+
+export enum ResourceEconomyMode {
+  UNLIMITED = 'unlimited',
+  NATION_BASED = 'nation_based'
+}
+
+export enum CityMode {
+  NATION_CITIES = 'nation_cities',
+  MAX_MILITARIZATION = 'max_militarization'
+}
+
+export enum TurnCooldown {
+  THIRTY_SECONDS = 30,
+  ONE_MINUTE = 60,
+  TWO_MINUTES = 120,
+  FIVE_MINUTES = 300
+}
+
+export enum UnitBuyingFrequency {
+  EVERY_TURN = 1,
+  EVERY_TWO_TURNS = 2,
+  EVERY_THREE_TURNS = 3,
+  EVERY_FOUR_TURNS = 4,
+  EVERY_FIVE_TURNS = 5
 }
 
 // MAP (Military Action Points) System
@@ -84,6 +110,33 @@ export interface SimulationSettings {
   isPrivate: boolean;
   inviteNationId?: string;
   inviteMessage?: string;
+}
+
+export interface MultiplayerSettings {
+  resourceEconomy: ResourceEconomyMode;
+  turnCooldown: TurnCooldown;
+  unitBuyingFrequency: UnitBuyingFrequency;
+  cityMode: CityMode;
+  maxMilitarizationSetup?: {
+    barracks: number;
+    hangars: number;
+    factories: number;
+    drydocks: number;
+  };
+  customNationCounts?: {
+    attacking: {
+      soldiers: number;
+      tanks: number;
+      aircraft: number;
+      ships: number;
+    };
+    defending: {
+      soldiers: number;
+      tanks: number;
+      aircraft: number;
+      ships: number;
+    };
+  };
 }
 
 export interface CityBuild {
@@ -156,14 +209,24 @@ export interface BattleSession {
   id: string;
   mode: BattleMode;
   settings: SimulationSettings;
+  multiplayerSettings?: MultiplayerSettings;
   participants: SimulatedNation[];
   currentTurn: number;
   turnTimer: number;
+  turnStartTime: number; // Timestamp when current turn started
+  lastUnitBuyTurn: Record<string, number>; // Track when each player last bought units
   isActive: boolean;
   winner?: string;
   battleHistory?: BattleHistoryEntry[];
   created_at: string;
   updated_at: string;
+  savedProgress?: BattleSaveData;
+}
+
+export interface BattleSaveData {
+  sessionState: Omit<BattleSession, 'savedProgress'>;
+  timestamp: string;
+  version: string;
 }
 
 export interface BattleHistoryEntry {

@@ -14,7 +14,9 @@ import {
   BUILDING_LIMITS,
   AttackType,
   AttackAction,
-  BattleAction
+  BattleAction,
+  MultiplayerSettings,
+  BattleMode
 } from '../types/simulation';
 
 export class BattleSimulationEngine {
@@ -24,7 +26,7 @@ export class BattleSimulationEngine {
   /**
    * Create a new battle simulation session
    */
-  createSession(settings: SimulationSettings, hostNation: Partial<SimulatedNation>): BattleSession {
+  createSession(settings: SimulationSettings, hostNation: Partial<SimulatedNation>, multiplayerSettings?: MultiplayerSettings): BattleSession {
     const sessionId = this.generateSessionId();
     
     const host: SimulatedNation = {
@@ -55,9 +57,12 @@ export class BattleSimulationEngine {
       id: sessionId,
       mode: settings.battleMode,
       settings,
+      multiplayerSettings,
       participants: [host],
       currentTurn: 1,
-      turnTimer: settings.turnCooldown,
+      turnTimer: multiplayerSettings?.turnCooldown || settings.turnCooldown,
+      turnStartTime: Date.now(),
+      lastUnitBuyTurn: { [host.id]: 0 }, // Track last unit purchase turn for each player
       isActive: false,
       battleHistory: [],
       created_at: new Date().toISOString(),
@@ -102,8 +107,173 @@ export class BattleSimulationEngine {
     };
 
     session.participants.push(participant);
+    session.lastUnitBuyTurn[participant.id] = 0; // Initialize unit buy tracking
     session.updated_at = new Date().toISOString();
     return true;
+  }
+
+  /**
+   * Start a multiplayer session with custom settings
+   */
+  startMultiplayerSession(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.participants.length < 2) {
+      return false;
+    }
+
+    session.isActive = true;
+    session.turnStartTime = Date.now();
+    session.updated_at = new Date().toISOString();
+
+    // Start turn timer if multiplayer
+    if (session.mode === BattleMode.MULTIPLAYER && session.multiplayerSettings) {
+      this.startTurnTimer(sessionId);
+    }
+
+    return true;
+  }
+
+  /**
+   * Check if a player can buy units based on multiplayer settings
+   */
+  canPlayerBuyUnits(sessionId: string, playerId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session || !session.multiplayerSettings) {
+      return true; // Default allow if not multiplayer
+    }
+
+    const lastBuyTurn = session.lastUnitBuyTurn[playerId] || 0;
+    const turnsSinceLastBuy = session.currentTurn - lastBuyTurn;
+    
+    return turnsSinceLastBuy >= session.multiplayerSettings.unitBuyingFrequency;
+  }
+
+  /**
+   * Purchase military units for a player
+   */
+  purchaseUnits(sessionId: string, playerId: string, purchases: Partial<MilitaryBuild>): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+
+    const player = session.participants.find(p => p.id === playerId);
+    if (!player) return false;
+
+    // Check if player can buy units
+    if (!this.canPlayerBuyUnits(sessionId, playerId)) {
+      return false;
+    }
+
+    // Calculate costs and check resources
+    const costs = this.calculateUnitCosts(purchases);
+    if (!this.hasEnoughResources(player, costs)) {
+      return false;
+    }
+
+    // Deduct resources
+    Object.entries(costs).forEach(([resource, cost]) => {
+      if (resource in player.resources) {
+        (player.resources as any)[resource] -= cost;
+      }
+    });
+
+    // Add units
+    Object.entries(purchases).forEach(([unitType, amount]) => {
+      if (unitType in player.military && amount !== undefined) {
+        (player.military as any)[unitType] += amount;
+      }
+    });
+
+    // Update last buy turn
+    session.lastUnitBuyTurn[playerId] = session.currentTurn;
+    session.updated_at = new Date().toISOString();
+
+    return true;
+  }
+
+  /**
+   * Advance to next turn (multiplayer)
+   */
+  advanceTurn(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+
+    session.currentTurn++;
+    session.turnStartTime = Date.now();
+    
+    // Give MAPs to all players
+    session.participants.forEach(participant => {
+      participant.maps = Math.min(participant.maps + MAP_CONSTANTS.MAPS_PER_TURN, participant.maxMaps);
+    });
+
+    session.updated_at = new Date().toISOString();
+
+    // Restart turn timer if multiplayer
+    if (session.mode === BattleMode.MULTIPLAYER && session.multiplayerSettings) {
+      this.startTurnTimer(sessionId);
+    }
+
+    return true;
+  }
+
+  /**
+   * Get time remaining in current turn
+   */
+  getTurnTimeRemaining(sessionId: string): number {
+    const session = this.sessions.get(sessionId);
+    if (!session || !session.multiplayerSettings) return 0;
+
+    const elapsed = Date.now() - session.turnStartTime;
+    const remaining = (session.multiplayerSettings.turnCooldown * 1000) - elapsed;
+    
+    return Math.max(0, Math.floor(remaining / 1000));
+  }
+
+  /**
+   * Calculate unit purchase costs
+   */
+  private calculateUnitCosts(purchases: Partial<MilitaryBuild>): Record<string, number> {
+    const costs: Record<string, number> = {
+      money: 0,
+      steel: 0,
+      aluminum: 0,
+      gasoline: 0,
+      munitions: 0
+    };
+
+    // Unit costs (simplified P&W costs)
+    if (purchases.soldiers) {
+      costs.money += purchases.soldiers * 2.5;
+      costs.munitions += purchases.soldiers * 1;
+    }
+    if (purchases.tanks) {
+      costs.money += purchases.tanks * 50;
+      costs.steel += purchases.tanks * 1;
+      costs.gasoline += purchases.tanks * 1;
+    }
+    if (purchases.aircraft) {
+      costs.money += purchases.aircraft * 100;
+      costs.aluminum += purchases.aircraft * 2;
+      costs.gasoline += purchases.aircraft * 2;
+    }
+    if (purchases.ships) {
+      costs.money += purchases.ships * 150;
+      costs.steel += purchases.ships * 3;
+      costs.gasoline += purchases.ships * 2;
+    }
+
+    return costs;
+  }
+
+  /**
+   * Check if player has enough resources
+   */
+  private hasEnoughResources(player: SimulatedNation, costs: Record<string, number>): boolean {
+    return Object.entries(costs).every(([resource, cost]) => {
+      if (resource in player.resources) {
+        return (player.resources as any)[resource] >= cost;
+      }
+      return true;
+    });
   }
 
   /**
