@@ -763,6 +763,89 @@ export class BattleSimulationEngine {
   }
 
   /**
+   * Log army composition for battle analysis
+   */
+  private logArmyComposition(attacker: SimulatedNation, defender: SimulatedNation, battleLog: string[]) {
+    battleLog.push(`⚔️  ARMY COMPOSITION:`);
+    
+    // Attacker composition
+    const attackerSoldierValue = this.calculateSoldierArmyValue(attacker);
+    const attackerTankValue = attacker.resources.gasoline > 0 ? attacker.military.tanks * 40 : 0;
+    battleLog.push(`   ${attacker.nation_name}:`);
+    battleLog.push(`     • ${attacker.military.soldiers.toLocaleString()} soldiers (${attackerSoldierValue.toLocaleString()} value)`);
+    battleLog.push(`     • ${attacker.military.tanks.toLocaleString()} tanks (${attackerTankValue.toLocaleString()} value)`);
+    battleLog.push(`     • Munitions: ${attacker.resources.munitions > 0 ? '✅' : '❌'} | Gasoline: ${attacker.resources.gasoline > 0 ? '✅' : '❌'}`);
+    
+    // Defender composition
+    const defenderSoldierValue = this.calculateSoldierArmyValue(defender);
+    const defenderTankValue = defender.resources.gasoline > 0 ? defender.military.tanks * 40 : 0;
+    battleLog.push(`   ${defender.nation_name}:`);
+    battleLog.push(`     • ${defender.military.soldiers.toLocaleString()} soldiers (${defenderSoldierValue.toLocaleString()} value)`);
+    battleLog.push(`     • ${defender.military.tanks.toLocaleString()} tanks (${defenderTankValue.toLocaleString()} value)`);
+    battleLog.push(`     • Munitions: ${defender.resources.munitions > 0 ? '✅' : '❌'} | Gasoline: ${defender.resources.gasoline > 0 ? '✅' : '❌'}`);
+  }
+
+  /**
+   * Calculate casualty efficiency ratio
+   */
+  private calculateCasualtyEfficiency(attackerLosses: any, defenderLosses: any, attackerWon: boolean): number {
+    const attackerCasualtyValue = (attackerLosses.soldiers * 1.75) + (attackerLosses.tanks * 40);
+    const defenderCasualtyValue = (defenderLosses.soldiers * 1.75) + (defenderLosses.tanks * 40);
+    
+    if (attackerCasualtyValue === 0) return defenderCasualtyValue > 0 ? 999 : 1;
+    if (defenderCasualtyValue === 0) return 0;
+    
+    return defenderCasualtyValue / attackerCasualtyValue;
+  }
+
+  /**
+   * Assess roll quality compared to expected performance
+   */
+  private assessRollQuality(rolls: number[], maxPossible: number): 'excellent' | 'good' | 'average' | 'poor' {
+    const averageRoll = rolls.reduce((a, b) => a + b, 0) / rolls.length;
+    const expectedAverage = maxPossible * 0.7; // Expected 70% performance
+    const performance = averageRoll / expectedAverage;
+    
+    if (performance >= 1.2) return 'excellent';
+    if (performance >= 1.05) return 'good';
+    if (performance >= 0.95) return 'average';
+    return 'poor';
+  }
+
+  /**
+   * Generate tactical summary based on battle results
+   */
+  private generateTacticalSummary(outcome: string, strengthRatio: number, casualtyEfficiency: number, rollQuality: string): string {
+    let summary = '';
+    
+    if (outcome === 'IT' || outcome === 'MS') {
+      summary = 'Victory achieved! ';
+      if (strengthRatio > 2) {
+        summary += 'Overwhelming force advantage secured the win.';
+      } else if (rollQuality === 'excellent') {
+        summary += 'Exceptional tactical execution overcame the enemy.';
+      } else if (casualtyEfficiency > 2) {
+        summary += 'Efficient battle tactics minimized losses.';
+      } else {
+        summary += 'Hard-fought victory through determination.';
+      }
+    } else {
+      summary = 'Defeat suffered. ';
+      if (strengthRatio < 0.5) {
+        summary += 'Enemy force advantage proved decisive.';
+      } else if (rollQuality === 'poor') {
+        summary += 'Poor battlefield performance led to failure.';
+      } else if (casualtyEfficiency < 0.5) {
+        summary += 'Heavy casualties undermined the attack.';
+      } else {
+        summary += 'Close battle that could have gone either way.';
+      }
+    }
+    
+    return summary;
+  }
+
+  /**
    * Calculate soldier army value component
    */
   private calculateSoldierArmyValue(nation: SimulatedNation): number {
