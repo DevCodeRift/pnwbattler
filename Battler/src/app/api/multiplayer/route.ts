@@ -639,6 +639,35 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      case 'get-battle-state': {
+        const { battleId } = data;
+        
+        const battle = await prisma.battle.findUnique({
+          where: { id: battleId },
+          include: {
+            lobby: {
+              include: {
+                players: true,
+              },
+            },
+          },
+        });
+
+        if (!battle) {
+          return NextResponse.json({ error: 'Battle not found' }, { status: 404 });
+        }
+
+        return NextResponse.json({ 
+          battle: {
+            id: battle.id,
+            status: battle.status,
+            gameState: battle.gameState,
+            lobby: battle.lobby,
+            startedAt: battle.startedAt
+          }
+        });
+      }
+
       case 'start-battle': {
         const { lobbyId } = data;
         
@@ -708,20 +737,43 @@ export async function POST(request: NextRequest) {
 
         console.log('Lobby status updated to IN_PROGRESS');
 
-        // Create battle
+        // Create battle with properly initialized players
+        const initialGameState = {
+          turn: 1,
+          players: {} as any,
+          battleHistory: [],
+          settings: lobby.settings,
+        };
+
+        // Initialize all players with starting military and resources
+        lobby.players.forEach((player: any, index: number) => {
+          initialGameState.players[player.id] = {
+            id: player.id,
+            name: player.name,
+            side: index === 0 ? 'side1' : 'side2',
+            military: {
+              soldiers: 5000,
+              tanks: 500,
+              aircraft: 50,
+              ships: 10
+            },
+            resources: {
+              money: 1000000,
+              gasoline: 1000,
+              munitions: 1000,
+              steel: 500,
+              aluminum: 500
+            },
+            maps: 6, // Starting MAPs
+            resistance: 100
+          };
+        });
+
         const battle = await prisma.battle.create({
           data: {
             lobbyId,
             status: 'IN_PROGRESS',
-            gameState: {
-              turn: 1,
-              players: lobby.players.map((player: any, index: number) => ({
-                id: player.id,
-                name: player.name,
-                side: index === 0 ? 'side1' : 'side2',
-              })),
-              settings: lobby.settings,
-            },
+            gameState: initialGameState,
             startedAt: new Date(),
           },
         });
