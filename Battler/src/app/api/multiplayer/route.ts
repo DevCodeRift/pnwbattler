@@ -14,10 +14,11 @@ const pusher = new Pusher({
   useTLS: true,
 });
 
-// Battle simulation helper functions
+// Battle simulation helper functions using authentic P&W mechanics
+// Authentic P&W battle simulation
 function simulateBattle(attacker: any, defender: any, attackType: string, unitsUsed: any, useMunitions: boolean, airstrikeTarget?: string) {
-  // Simplified battle simulation based on Politics & War mechanics
-  console.log('Simulating battle:', { attackType, unitsUsed, attacker: attacker.name, defender: defender.name });
+  // Authentic Politics & War battle simulation
+  console.log('Simulating battle with P&W mechanics:', { attackType, unitsUsed, attacker: attacker.name, defender: defender.name });
 
   const rollOutcomes = ['Utter Failure', 'Pyrrhic Victory', 'Moderate Success', 'Immense Triumph'];
   const resistanceLoss = { 'Utter Failure': 0, 'Pyrrhic Victory': 4, 'Moderate Success': 7, 'Immense Triumph': 10 };
@@ -27,98 +28,175 @@ function simulateBattle(attacker: any, defender: any, attackType: string, unitsU
   let attackerLosses = { soldiers: 0, tanks: 0, aircraft: 0, ships: 0 };
   let defenderLosses = { soldiers: 0, tanks: 0, aircraft: 0, ships: 0 };
   let resourcesUsed = { gasoline: 0, munitions: 0 };
+  let loot = 0;
+  let infraDamage = 0;
 
-  switch (attackType) {
-    case 'ground':
-      // Ground battle calculation
-      attackerStrength = (unitsUsed.soldiers || 0) * (useMunitions ? 1.75 : 1) + (unitsUsed.tanks || 0) * 40;
-      defenderStrength = defender.military.soldiers * 1.75 + defender.military.tanks * 40;
-      
-      // Resource consumption
-      if (unitsUsed.tanks && unitsUsed.tanks > 0) {
-        resourcesUsed.gasoline = Math.ceil(unitsUsed.tanks / 100);
-        resourcesUsed.munitions = Math.ceil(unitsUsed.tanks / 100);
-      }
-      if (useMunitions && unitsUsed.soldiers && unitsUsed.soldiers > 0) {
-        resourcesUsed.munitions += Math.ceil(unitsUsed.soldiers / 5000);
-      }
-
-      // Calculate losses (simplified)
-      attackerLosses.soldiers = Math.floor((unitsUsed.soldiers || 0) * (0.05 + Math.random() * 0.15));
-      attackerLosses.tanks = Math.floor((unitsUsed.tanks || 0) * (0.03 + Math.random() * 0.1));
-      defenderLosses.soldiers = Math.floor(defender.military.soldiers * (0.02 + Math.random() * 0.08));
-      defenderLosses.tanks = Math.floor(defender.military.tanks * (0.02 + Math.random() * 0.08));
-      break;
-
-    case 'air':
-      // Air battle calculation
-      attackerStrength = (unitsUsed.aircraft || 0) * 3;
-      defenderStrength = defender.military.aircraft * 3;
-      
-      // Resource consumption for aircraft
-      if (unitsUsed.aircraft && unitsUsed.aircraft > 0) {
-        resourcesUsed.gasoline = Math.ceil(unitsUsed.aircraft / 4);
-        resourcesUsed.munitions = Math.ceil(unitsUsed.aircraft / 4);
-      }
-
-      // Calculate losses
-      attackerLosses.aircraft = Math.floor((unitsUsed.aircraft || 0) * (0.05 + Math.random() * 0.15));
-      defenderLosses.aircraft = Math.floor(defender.military.aircraft * (0.05 + Math.random() * 0.15));
-      
-      // If targeting other units
-      if (airstrikeTarget && airstrikeTarget !== 'aircraft') {
-        const targetDamage = Math.floor((unitsUsed.aircraft || 0) * 35 * (0.85 + Math.random() * 0.2));
-        switch (airstrikeTarget) {
-          case 'soldiers':
-            defenderLosses.soldiers = Math.min(defender.military.soldiers, targetDamage);
-            break;
-          case 'tanks':
-            defenderLosses.tanks = Math.min(defender.military.tanks, Math.floor(targetDamage / 35));
-            break;
-        }
-      }
-      break;
-
-    case 'naval':
-      // Naval battle calculation
-      attackerStrength = (unitsUsed.ships || 0) * 4;
-      defenderStrength = defender.military.ships * 4;
-      
-      // Resource consumption for ships
-      if (unitsUsed.ships && unitsUsed.ships > 0) {
-        resourcesUsed.gasoline = unitsUsed.ships * 1;
-        resourcesUsed.munitions = Math.ceil(unitsUsed.ships * 1.75);
-      }
-
-      // Calculate losses
-      attackerLosses.ships = Math.floor((unitsUsed.ships || 0) * (0.03 + Math.random() * 0.1));
-      defenderLosses.ships = Math.floor(defender.military.ships * (0.03 + Math.random() * 0.1));
-      break;
+  // Helper function to calculate P&W victory roll
+  function calculateVictoryRoll(attacking: number, defending: number): number {
+    if (attacking <= 0.4 * defending) return 0; // Utter failure
+    if (defending < 0.4 * attacking) return 3; // Immense triumph
+    
+    const defMean = (defending + defending * 0.4) / 2;
+    const minAtt = attacking * 0.4;
+    const roll = 3 * (attacking - defMean) / ((attacking - defMean) + (defMean - minAtt));
+    return Math.max(0, Math.min(3, roll));
   }
 
-  // Determine battle outcome based on strength comparison
-  const strengthRatio = attackerStrength / Math.max(defenderStrength, 1);
-  let outcome: string;
-  
-  if (strengthRatio > 3) {
-    outcome = 'Immense Triumph';
-  } else if (strengthRatio > 1.5) {
-    outcome = 'Moderate Success';
-  } else if (strengthRatio > 0.7) {
-    outcome = 'Pyrrhic Victory';
-  } else {
-    outcome = 'Utter Failure';
-  }
-
-  // Add some randomness
-  const randomFactor = Math.random();
-  if (randomFactor < 0.15) {
-    const currentIndex = rollOutcomes.indexOf(outcome);
-    if (randomFactor < 0.075 && currentIndex > 0) {
-      outcome = rollOutcomes[currentIndex - 1]; // Worse outcome
-    } else if (currentIndex < rollOutcomes.length - 1) {
-      outcome = rollOutcomes[currentIndex + 1]; // Better outcome
+  // Helper function to get resource consumption scaling
+  function getResourceScaling(victoryType: number): number {
+    switch (Math.round(victoryType)) {
+      case 0: return 0.4; // Utter failure
+      case 1: return 0.7; // Small victory  
+      case 2: return 0.9; // Moderate victory
+      case 3: return 1.0; // Immense triumph
+      default: return 0.7;
     }
+  }
+
+  const fortifyFactor = 1.0; // Assume no fortification for now
+  
+  switch (attackType) {
+    case 'ground': {
+      // Ground attack strength calculation (P&W authentic)
+      const attSoldiers = unitsUsed.soldiers || 0;
+      const attTanks = unitsUsed.tanks || 0;
+      const soldiersUnarmed = useMunitions ? 0 : attSoldiers; // Soldiers without munitions
+      const soldiersArmed = useMunitions ? attSoldiers : 0;
+      
+      attackerStrength = (attTanks * 40) + (soldiersArmed * 1.75) + soldiersUnarmed;
+      defenderStrength = (defender.military.tanks * 40) + Math.max(50, defender.military.soldiers * 1.75);
+      
+      const roll = calculateVictoryRoll(attackerStrength, defenderStrength);
+      const victory = Math.round(roll);
+      const resourceScaling = getResourceScaling(victory);
+      
+      // Ground attack casualties (authentic P&W formulas)
+      const attTankStr = attTanks * 40;
+      const attSoldStr = soldiersArmed * 1.75;
+      const defSoldStr = defender.military.soldiers * 1.75;
+      const defTankStr = defender.military.tanks * 40;
+      const defFactor = Math.max(1, defenderStrength);
+      
+      // Tank losses
+      defenderLosses.tanks = Math.max(0, Math.floor(((attTankStr * 0.7 + 1) / defFactor + (attSoldStr * 0.7 + 1) / 2250) * 1.33));
+      attackerLosses.tanks = Math.max(0, Math.floor(defenderLosses.tanks * fortifyFactor));
+      
+      // Soldier losses  
+      attackerLosses.soldiers = Math.max(0, Math.floor(((defSoldStr * 0.7 + 1) / 22 + (defTankStr * 0.7 + 1) / 7.33) * fortifyFactor * 0.3125));
+      defenderLosses.soldiers = Math.max(0, Math.floor((attSoldStr * 0.7 + 1) / 22 + (attTankStr * 0.7 + 1) / 7.33 * 0.3125));
+      
+      // Resource consumption (P&W authentic)
+      const baseMunitions = 0.0002 * attSoldiers + 0.01 * attTanks;
+      const baseGasoline = 0.01 * attTanks;
+      resourcesUsed.munitions = Math.ceil(baseMunitions * resourceScaling);
+      resourcesUsed.gasoline = Math.ceil(baseGasoline * resourceScaling);
+      
+      // Loot calculation
+      loot = Math.floor((attSoldiers * 0.99 + attTanks * 22.625) * victory);
+      loot = Math.min(loot, defender.resources.money * 0.75); // Capped by 75% of defender wealth
+      loot = Math.min(loot, 50000); // Limited by 50k per city (assuming 1 city)
+      
+      break;
+    }
+
+    case 'air': {
+      const attAircraft = unitsUsed.aircraft || 0;
+      const defAir = defender.military.aircraft;
+      
+      attackerStrength = attAircraft * 200; // Simplified air strength
+      defenderStrength = defAir * 200;
+      
+      const roll = calculateVictoryRoll(attackerStrength, defenderStrength);
+      const victory = Math.round(roll);
+      
+      // Target-specific damage (P&W authentic)
+      const effectiveAircraft = Math.max(0, attAircraft - 0.5 * defAir);
+      
+      if (!airstrikeTarget || airstrikeTarget === 'aircraft') {
+        // Dogfight formula
+        attackerLosses.aircraft = Math.max(0, Math.floor(0.638554 * fortifyFactor * 9 * (defAir * 0.7) / 54));
+        defenderLosses.aircraft = Math.max(0, Math.floor(0.638554 * 9 * (attAircraft * 0.7) / 38));
+      } else {
+        // Standard airstrike aircraft losses
+        attackerLosses.aircraft = Math.max(0, Math.floor(fortifyFactor * 9 * (defAir * 0.7) / 54));
+        defenderLosses.aircraft = Math.max(0, Math.floor(9 * (attAircraft * 0.7) / 54));
+      }
+      
+      switch (airstrikeTarget) {
+        case 'soldiers':
+          const soldierKills = 0.581395 * roll * Math.round(Math.min(
+            defender.military.soldiers,
+            Math.min(defender.military.soldiers * 0.75 + 1000, effectiveAircraft * 50 * 0.95)
+          ) / 3);
+          defenderLosses.soldiers = Math.max(0, Math.floor(soldierKills));
+          break;
+          
+        case 'tanks':
+          const tankKills = 0.325581 * roll * Math.round(Math.min(
+            defender.military.tanks,
+            Math.min(defender.military.tanks * 0.75 + 10, effectiveAircraft * 2.5 * 0.95)
+          ) / 3);
+          defenderLosses.tanks = Math.max(0, Math.floor(tankKills));
+          // Halved aircraft losses for tank attack
+          attackerLosses.aircraft = Math.floor(attackerLosses.aircraft * 0.5);
+          defenderLosses.aircraft = Math.floor(defenderLosses.aircraft * 0.5);
+          break;
+          
+        case 'ships':
+          const shipKills = 0.829268 * roll * Math.round(Math.min(
+            defender.military.ships,
+            Math.min(defender.military.ships * 0.5 + 4, effectiveAircraft * 0.0285 * 0.95)
+          ) / 3);
+          defenderLosses.ships = Math.max(0, Math.floor(shipKills));
+          // Same aircraft losses as tank attack
+          attackerLosses.aircraft = Math.floor(attackerLosses.aircraft * 0.5);
+          defenderLosses.aircraft = Math.floor(defenderLosses.aircraft * 0.5);
+          break;
+      }
+      
+      // Air resource consumption
+      const resourceScaling = getResourceScaling(victory);
+      resourcesUsed.gasoline = Math.ceil(attAircraft * 0.25 * resourceScaling);
+      resourcesUsed.munitions = Math.ceil(attAircraft * 0.25 * resourceScaling);
+      
+      break;
+    }
+
+    case 'naval': {
+      const attShips = unitsUsed.ships || 0;
+      const defShips = defender.military.ships;
+      
+      attackerStrength = attShips * 150; // Simplified naval strength
+      defenderStrength = defShips * 150;
+      
+      const roll = calculateVictoryRoll(attackerStrength, defenderStrength);
+      const victory = Math.round(roll);
+      const resourceScaling = getResourceScaling(victory);
+      
+      // Ship losses (P&W authentic)
+      attackerLosses.ships = Math.max(0, Math.floor(0.441666 * fortifyFactor * 12 * (defShips * 0.7) / 35));
+      defenderLosses.ships = Math.max(0, Math.floor(0.441666 * 12 * (attShips * 0.7) / 35));
+      
+      // Naval resource consumption (P&W authentic)
+      resourcesUsed.gasoline = Math.ceil(2 * attShips * resourceScaling);
+      resourcesUsed.munitions = Math.ceil(3 * attShips * resourceScaling);
+      
+      break;
+    }
+  }
+
+  // Determine battle outcome based on the roll
+  const strengthRatio = attackerStrength / Math.max(defenderStrength, 1);
+  const roll = calculateVictoryRoll(attackerStrength, defenderStrength);
+  const victoryIndex = Math.round(roll);
+  let outcome = rollOutcomes[victoryIndex] || 'Utter Failure';
+
+  // Add some controlled randomness (±10% chance to shift outcome)
+  const randomFactor = Math.random();
+  if (randomFactor < 0.1 && victoryIndex > 0) {
+    outcome = rollOutcomes[victoryIndex - 1]; // Slightly worse outcome
+  } else if (randomFactor > 0.9 && victoryIndex < rollOutcomes.length - 1) {
+    outcome = rollOutcomes[victoryIndex + 1]; // Slightly better outcome
   }
 
   const resistanceReduced = resistanceLoss[outcome as keyof typeof resistanceLoss] || 0;
@@ -131,6 +209,10 @@ function simulateBattle(attacker: any, defender: any, attackType: string, unitsU
     defenderLosses,
     resourcesUsed,
     resistanceReduced,
+    loot,
+    infraDamage,
+    roll: roll,
+    victory: victoryIndex,
     description: generateBattleDescription(outcome, attackType, unitsUsed, attackerLosses, defenderLosses)
   };
 }
@@ -152,8 +234,22 @@ function applyBattleResults(attacker: any, defender: any, result: any) {
   attacker.resources.gasoline = Math.max(0, attacker.resources.gasoline - result.resourcesUsed.gasoline);
   attacker.resources.munitions = Math.max(0, attacker.resources.munitions - result.resourcesUsed.munitions);
 
+  // Apply loot if any
+  if (result.loot && result.loot > 0) {
+    attacker.resources.money += result.loot;
+    defender.resources.money = Math.max(0, defender.resources.money - result.loot);
+  }
+
   // Reduce defender resistance
   defender.resistance = Math.max(0, defender.resistance - result.resistanceReduced);
+
+  // Check for resistance plunder (when resistance hits 0)
+  if (defender.resistance === 0) {
+    const plunderMoney = Math.floor(defender.resources.money * 0.1);
+    attacker.resources.money += plunderMoney;
+    defender.resources.money -= plunderMoney;
+    // Note: Infrastructure damage would be applied here in a full implementation
+  }
 }
 
 function calculateRecruitmentCost(units: any) {
@@ -171,6 +267,20 @@ function calculateRecruitmentCost(units: any) {
   if (units.ships) totalCost += units.ships * costs.ships;
 
   return { money: totalCost };
+}
+
+// Helper function to regenerate MAPs over time
+function regenerateMAPs(player: any, lastActionTime: number): void {
+  const now = Date.now();
+  const timeDiff = now - lastActionTime;
+  const hoursElapsed = timeDiff / (1000 * 60 * 60); // Convert to hours
+  
+  // In P&W, MAPs regenerate at 2 per day (24 hours = 2 MAPs, so 12 hours per MAP)
+  const mapsToAdd = Math.floor(hoursElapsed / 12);
+  
+  if (mapsToAdd > 0) {
+    player.maps = Math.min(12, player.maps + mapsToAdd); // Cap at 12 MAPs
+  }
 }
 
 function generateBattleDescription(outcome: string, attackType: string, unitsUsed: any, attackerLosses: any, defenderLosses: any): string {
@@ -884,6 +994,10 @@ export async function POST(request: NextRequest) {
         let actionResult: any = null;
         const playerData = currentGameState.players[currentPlayer.id];
 
+        // Regenerate MAPs based on time elapsed since last action
+        const lastActionTime = currentGameState.lastActionTime || Date.now();
+        regenerateMAPs(playerData, lastActionTime);
+
         try {
           switch (battleAction) {
             case 'attack': {
@@ -920,7 +1034,7 @@ export async function POST(request: NextRequest) {
 
               const targetData = currentGameState.players[targetPlayer.id];
 
-              // Check MAP costs
+              // Check MAP costs (P&W authentic)
               const mapCosts = {
                 ground: 3,
                 air: 4,
@@ -930,13 +1044,13 @@ export async function POST(request: NextRequest) {
               const mapCost = mapCosts[attackType as keyof typeof mapCosts] || 0;
               
               if (playerData.maps < mapCost) {
-                return NextResponse.json({ error: 'Not enough MAPs for this attack' }, { status: 400 });
+                return NextResponse.json({ error: `Not enough MAPs for this attack. Need ${mapCost}, have ${playerData.maps}` }, { status: 400 });
               }
 
               // Deduct MAPs
               playerData.maps -= mapCost;
 
-              // Simulate battle outcome
+              // Simulate battle outcome with P&W mechanics
               actionResult = simulateBattle(playerData, targetData, attackType, unitsUsed, useMunitions, airstrikeTarget);
               
               // Apply battle results
@@ -991,7 +1105,7 @@ export async function POST(request: NextRequest) {
           }
           currentGameState.battleHistory.push(battleLogEntry);
 
-          // Update game state
+          // Update game state with action time
           currentGameState.lastAction = {
             playerId: currentPlayer.id,
             battleAction,
@@ -999,6 +1113,7 @@ export async function POST(request: NextRequest) {
             result: actionResult,
             timestamp: new Date().toISOString(),
           };
+          currentGameState.lastActionTime = Date.now(); // Track time for MAP regeneration
 
           // Save updated game state
           await prisma.battle.update({
