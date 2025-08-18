@@ -10,14 +10,15 @@ const getApiKey = () => {
     ? serverKey || publicKey
     : publicKey;
     
-  console.log('API Key check:', {
-    isServer: typeof window === 'undefined',
-    hasServerKey: !!serverKey,
-    hasPublicKey: !!publicKey,
-    usingKey: apiKey ? `${apiKey.substring(0, 6)}...` : 'none',
-    keyLength: apiKey?.length || 0,
-    nodeEnv: process.env.NODE_ENV
-  });
+  // Removed excessive console logging to improve performance
+  // console.log('API Key check:', {
+  //   isServer: typeof window === 'undefined',
+  //   hasServerKey: !!serverKey,
+  //   hasPublicKey: !!publicKey,
+  //   usingKey: apiKey ? `${apiKey.substring(0, 6)}...` : 'none',
+  //   keyLength: apiKey?.length || 0,
+  //   nodeEnv: process.env.NODE_ENV
+  // });
   
   if (!apiKey) {
     console.error('CRITICAL: No API key found! Available env vars:', {

@@ -210,7 +210,7 @@ export default function HomePage() {
       if (vercelMultiplayerManager.isConnected && isConnected) {
         vercelMultiplayerManager.getActiveGames();
       }
-    }, 45000); // Increased from 30 seconds to 45 seconds
+    }, 60000); // Increased from 45 seconds to 60 seconds
 
     // Cleanup function
     return () => {
@@ -224,6 +224,13 @@ export default function HomePage() {
       vercelMultiplayerManager.off('battle-created', handleBattleCreated);
     };
   }, [isConnected]); // Minimal dependencies
+
+  // Separate effect for loading user's games
+  useEffect(() => {
+    if (session?.user?.name) {
+      loadMyGames();
+    }
+  }, [session?.user?.name]);
 
   const joinLobby = async (lobbyId: string, asSpectator = false) => {
     if (!session?.user?.name) {
