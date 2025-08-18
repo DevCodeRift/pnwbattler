@@ -4,53 +4,125 @@ class VercelMultiplayerManager {
   private pusher: Pusher | null = null;
   private callbacks: Map<string, Function[]> = new Map();
   private currentPlayerId: string = '';
+  private isConnecting: boolean = false;
+  private connectionAttempts: number = 0;
+  private maxConnectionAttempts: number = 3;
 
   constructor() {
     this.currentPlayerId = `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   connect() {
-    if (this.pusher?.connection.state === 'connected') return;
+    // Prevent multiple simultaneous connection attempts
+    if (this.isConnecting) {
+      console.log('VercelMultiplayerManager: Connection already in progress');
+      return;
+    }
 
-    this.pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-    });
+    // Check if already connected
+    if (this.pusher?.connection.state === 'connected') {
+      console.log('VercelMultiplayerManager: Already connected');
+      return;
+    }
 
-    // Subscribe to global events
-    const globalChannel = this.pusher.subscribe('multiplayer');
-    
-    globalChannel.bind('lobby-created', (data: any) => {
-      this.emit('lobby-created', data);
-    });
-    
-    globalChannel.bind('lobby-updated', (data: any) => {
-      this.emit('lobby-updated', data);
-    });
-    
-    globalChannel.bind('lobby-closed', (data: any) => {
-      this.emit('lobby-closed', data);
-    });
-    
-    globalChannel.bind('battle-created', (data: any) => {
-      this.emit('battle-created', data);
-    });
+    // Limit connection attempts to prevent infinite loops
+    if (this.connectionAttempts >= this.maxConnectionAttempts) {
+      console.warn('VercelMultiplayerManager: Max connection attempts reached');
+      return;
+    }
 
-    this.pusher.connection.bind('connected', () => {
-      console.log('Connected to Pusher');
-      this.emit('connected', { playerId: this.currentPlayerId });
-    });
+    this.isConnecting = true;
+    this.connectionAttempts++;
 
-    this.pusher.connection.bind('disconnected', () => {
-      console.log('Disconnected from Pusher');
-      this.emit('disconnected', {});
-    });
+    console.log(`VercelMultiplayerManager: Connecting (attempt ${this.connectionAttempts})`);
+
+    try {
+      // Disconnect existing connection if any
+      if (this.pusher) {
+        this.pusher.disconnect();
+        this.pusher = null;
+      }
+
+      this.pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+        cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+        enabledTransports: ['ws', 'wss'], // Limit to websockets only
+        disabledTransports: ['xhr_polling', 'xhr_streaming', 'sockjs'], // Disable polling
+      });
+
+      // Subscribe to global events with error handling
+      const globalChannel = this.pusher.subscribe('multiplayer');
+      
+      globalChannel.bind('lobby-created', (data: any) => {
+        try {
+          this.emit('lobby-created', data);
+        } catch (error) {
+          console.error('Error handling lobby-created event:', error);
+        }
+      });
+      
+      globalChannel.bind('lobby-updated', (data: any) => {
+        try {
+          this.emit('lobby-updated', data);
+        } catch (error) {
+          console.error('Error handling lobby-updated event:', error);
+        }
+      });
+      
+      globalChannel.bind('lobby-closed', (data: any) => {
+        try {
+          this.emit('lobby-closed', data);
+        } catch (error) {
+          console.error('Error handling lobby-closed event:', error);
+        }
+      });
+      
+      globalChannel.bind('battle-created', (data: any) => {
+        try {
+          this.emit('battle-created', data);
+        } catch (error) {
+          console.error('Error handling battle-created event:', error);
+        }
+      });
+
+      this.pusher.connection.bind('connected', () => {
+        console.log('VercelMultiplayerManager: Connected to Pusher');
+        this.isConnecting = false;
+        this.connectionAttempts = 0; // Reset on successful connection
+        this.emit('connected', { playerId: this.currentPlayerId });
+      });
+
+      this.pusher.connection.bind('disconnected', () => {
+        console.log('VercelMultiplayerManager: Disconnected from Pusher');
+        this.isConnecting = false;
+        this.emit('disconnected', {});
+      });
+
+      this.pusher.connection.bind('error', (error: any) => {
+        console.error('VercelMultiplayerManager: Pusher connection error:', error);
+        this.isConnecting = false;
+      });
+
+    } catch (error) {
+      console.error('VercelMultiplayerManager: Failed to create Pusher connection:', error);
+      this.isConnecting = false;
+    }
   }
 
   disconnect() {
+    console.log('VercelMultiplayerManager: Disconnecting');
+    this.isConnecting = false;
+    this.connectionAttempts = 0;
+    
     if (this.pusher) {
+      // Unbind all event listeners to prevent memory leaks
+      this.pusher.connection.unbind_all();
+      this.pusher.unsubscribe('multiplayer');
       this.pusher.disconnect();
       this.pusher = null;
     }
+    
+    // Clear all callbacks to prevent memory leaks
+    this.callbacks.clear();
   }
 
   // Lobby management

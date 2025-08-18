@@ -1,21 +1,27 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useAuthStore } from '../stores';
 
 export function useVerificationCheck() {
   const { data: session, status } = useSession();
   const { setVerified, setPWNation, isVerified } = useAuthStore();
+  const hasCheckedRef = useRef(false);
+  const isCheckingRef = useRef(false);
 
   useEffect(() => {
-    // Don't check if still loading or no session
-    if (status === 'loading' || !session) return;
-    
-    // Don't check if already verified
-    if (isVerified) return;
+    // Don't check if still loading, no session, already verified, or already checking
+    if (status === 'loading' || !session || isVerified || hasCheckedRef.current || isCheckingRef.current) {
+      return;
+    }
 
     const checkVerificationStatus = async () => {
+      if (isCheckingRef.current) return;
+      
+      isCheckingRef.current = true;
+      hasCheckedRef.current = true;
+
       try {
         console.log('useVerificationCheck: Starting verification status check');
         
@@ -38,8 +44,6 @@ export function useVerificationCheck() {
             setPWNation(data.nation);
           } else if (!data.verified) {
             console.log('useVerificationCheck: User not verified, clearing store');
-            // Clear verification if not verified in database
-            // This ensures localStorage doesn't override database truth
             setVerified(false);
             setPWNation(null);
           }
@@ -59,10 +63,23 @@ export function useVerificationCheck() {
       } catch (error) {
         console.error('useVerificationCheck: Network or unexpected error:', error);
         // Don't clear verification status on network errors
-        // This preserves user state during temporary connectivity issues
+      } finally {
+        isCheckingRef.current = false;
       }
     };
 
-    checkVerificationStatus();
+    // Add a small delay to prevent immediate API calls on every render
+    const timeoutId = setTimeout(checkVerificationStatus, 100);
+    
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, [session, status, isVerified, setVerified, setPWNation]);
+
+  // Reset hasChecked when session changes (user logs out/in)
+  useEffect(() => {
+    if (status !== 'loading') {
+      hasCheckedRef.current = false;
+    }
+  }, [session?.user?.email, status]);
 }

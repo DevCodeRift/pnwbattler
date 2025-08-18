@@ -41,10 +41,15 @@ export default function EnhancedMultiplayerBattleInterface({
   // Update battle analysis when attack type changes
   useEffect(() => {
     if (currentPlayer && opponent) {
-      const analysis = EnhancedBattleAnalyzer.analyzeBattle(currentPlayer, opponent, selectedAttackType);
-      setBattleAnalysis(analysis);
+      // Throttle analysis calculations to prevent performance issues
+      const timeoutId = setTimeout(() => {
+        const analysis = EnhancedBattleAnalyzer.analyzeBattle(currentPlayer, opponent, selectedAttackType);
+        setBattleAnalysis(analysis);
+      }, 200); // 200ms delay to throttle calculations
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [currentPlayer, opponent, selectedAttackType]);
+  }, [currentPlayer?.id, opponent?.id, selectedAttackType]); // Use stable IDs instead of objects
 
   if (loading) {
     return (

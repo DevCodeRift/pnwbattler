@@ -57,10 +57,22 @@ export default function HomePage() {
       router.push('/dashboard');
     }
   }, [session, isVerified, pwNation, router]);
+
+  // Add cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      console.log('HomePage: Cleaning up on unmount');
+      // Disconnect multiplayer manager when leaving the page
+      if (typeof window !== 'undefined') {
+        vercelMultiplayerManager.disconnect();
+      }
+    };
+  }, []);
   const [activeBattles, setActiveBattles] = useState<Battle[]>([]);
   const [myGames, setMyGames] = useState<MyGame[]>([]);
   const [onlineCount, setOnlineCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   const loadMyGames = useCallback(async () => {
     if (!session?.user) return;
@@ -82,64 +94,109 @@ export default function HomePage() {
   }, [session?.user]);
 
   useEffect(() => {
-    // Connect to multiplayer server
-    vercelMultiplayerManager.connect();
+    // Prevent multiple initializations
+    if (hasInitialized) return;
+    
+    console.log('HomePage: Initializing multiplayer connection');
+    setHasInitialized(true);
+
+    // Connect to multiplayer server with throttling
+    const connectWithDelay = setTimeout(() => {
+      vercelMultiplayerManager.connect();
+    }, 500); // Add delay to prevent immediate connection
 
     // Load user's games if logged in
     if (session?.user) {
-      loadMyGames();
+      const loadGamesTimeout = setTimeout(() => {
+        loadMyGames();
+      }, 1000); // Delay loading games
+      
+      return () => clearTimeout(loadGamesTimeout);
     }
 
-    // Set up event listeners
+    return () => {
+      clearTimeout(connectWithDelay);
+    };
+  }, [session?.user, loadMyGames, hasInitialized]);
+
+  useEffect(() => {
+    // Set up event listeners only once
     const handleConnected = () => {
+      console.log('HomePage: Connected to multiplayer');
       setIsConnected(true);
-      vercelMultiplayerManager.getActiveGames();
-      if (session?.user) {
-        loadMyGames();
-      }
+      
+      // Throttle initial data loading
+      setTimeout(() => {
+        vercelMultiplayerManager.getActiveGames();
+        if (session?.user) {
+          loadMyGames();
+        }
+      }, 1000);
     };
 
     const handleDisconnected = () => {
+      console.log('HomePage: Disconnected from multiplayer');
       setIsConnected(false);
     };
 
     const handleActiveGames = (data: { lobbies?: Lobby[]; battles?: Battle[] }) => {
-      const lobbies = data?.lobbies || [];
-      const battles = data?.battles || [];
-      
-      setActiveLobbies(lobbies);
-      setActiveBattles(battles);
-      setOnlineCount(
-        lobbies.reduce((acc, lobby) => acc + lobby.playerCount + lobby.spectatorCount, 0) +
-        battles.reduce((acc, battle) => acc + battle.playerCount + battle.spectatorCount, 0)
-      );
+      try {
+        const lobbies = data?.lobbies || [];
+        const battles = data?.battles || [];
+        
+        setActiveLobbies(lobbies);
+        setActiveBattles(battles);
+        setOnlineCount(
+          lobbies.reduce((acc, lobby) => acc + lobby.playerCount + lobby.spectatorCount, 0) +
+          battles.reduce((acc, battle) => acc + battle.playerCount + battle.spectatorCount, 0)
+        );
+      } catch (error) {
+        console.error('Error handling active games:', error);
+      }
     };
 
     const handleLobbyUpdated = (lobby: Lobby) => {
-      setActiveLobbies(prev => {
-        const index = prev.findIndex(l => l.id === lobby.id);
-        if (index >= 0) {
-          const newLobbies = [...prev];
-          newLobbies[index] = lobby;
-          return newLobbies;
-        } else {
-          return [...prev, lobby];
-        }
-      });
+      try {
+        setActiveLobbies(prev => {
+          const index = prev.findIndex(l => l.id === lobby.id);
+          if (index >= 0) {
+            const newLobbies = [...prev];
+            newLobbies[index] = lobby;
+            return newLobbies;
+          } else {
+            return [...prev, lobby];
+          }
+        });
+      } catch (error) {
+        console.error('Error handling lobby update:', error);
+      }
     };
 
     const handleLobbyCreated = (lobby: Lobby) => {
-      setActiveLobbies(prev => [...prev, lobby]);
+      try {
+        setActiveLobbies(prev => [...prev, lobby]);
+      } catch (error) {
+        console.error('Error handling lobby created:', error);
+      }
     };
 
     const handleLobbyClosed = ({ lobbyId }: { lobbyId: string }) => {
-      setActiveLobbies(prev => prev.filter(l => l.id !== lobbyId));
+      try {
+        setActiveLobbies(prev => prev.filter(l => l.id !== lobbyId));
+      } catch (error) {
+        console.error('Error handling lobby closed:', error);
+      }
     };
 
     const handleBattleCreated = (battle: Battle) => {
-      setActiveBattles(prev => [...prev, battle]);
+      try {
+        setActiveBattles(prev => [...prev, battle]);
+      } catch (error) {
+        console.error('Error handling battle created:', error);
+      }
     };
 
+    // Add event listeners
     vercelMultiplayerManager.on('connected', handleConnected);
     vercelMultiplayerManager.on('disconnected', handleDisconnected);
     vercelMultiplayerManager.on('active-games', handleActiveGames);
@@ -148,16 +205,14 @@ export default function HomePage() {
     vercelMultiplayerManager.on('lobby-closed', handleLobbyClosed);
     vercelMultiplayerManager.on('battle-created', handleBattleCreated);
 
-    // Refresh active games every 10 seconds
+    // Reduced frequency polling to prevent performance issues
     const interval = setInterval(() => {
-      if (vercelMultiplayerManager.isConnected) {
+      if (vercelMultiplayerManager.isConnected && isConnected) {
         vercelMultiplayerManager.getActiveGames();
-        if (session?.user) {
-          loadMyGames();
-        }
       }
-    }, 10000);
+    }, 45000); // Increased from 30 seconds to 45 seconds
 
+    // Cleanup function
     return () => {
       clearInterval(interval);
       vercelMultiplayerManager.off('connected', handleConnected);
@@ -168,7 +223,7 @@ export default function HomePage() {
       vercelMultiplayerManager.off('lobby-closed', handleLobbyClosed);
       vercelMultiplayerManager.off('battle-created', handleBattleCreated);
     };
-  }, [session, loadMyGames]);
+  }, [isConnected]); // Minimal dependencies
 
   const joinLobby = async (lobbyId: string, asSpectator = false) => {
     if (!session?.user?.name) {

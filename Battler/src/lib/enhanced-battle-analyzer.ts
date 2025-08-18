@@ -160,31 +160,41 @@ export class EnhancedBattleAnalyzer {
   private static calculateVictoryProbabilities(armyStrengths: { attacker: number; defender: number; ratio: number }) {
     const { ratio } = armyStrengths;
     
-    // Simulate 1000 battles to get accurate probabilities
-    let itCount = 0, msCount = 0, pvCount = 0, ufCount = 0;
+    // Use simplified probability calculation instead of running 1000 simulations
+    // This prevents browser lag/crashes from excessive calculations
+    let itProb = 0, msProb = 0, pvProb = 0, ufProb = 0;
     
-    for (let i = 0; i < 1000; i++) {
-      const attackerRolls = this.simulateBattleRolls(armyStrengths.attacker);
-      const defenderRolls = this.simulateBattleRolls(armyStrengths.defender);
-      
-      let attackerWins = 0;
-      for (let j = 0; j < 3; j++) {
-        if (attackerRolls[j] > defenderRolls[j]) {
-          attackerWins++;
-        }
-      }
-      
-      if (attackerWins === 3) itCount++;
-      else if (attackerWins === 2) msCount++;
-      else if (attackerWins === 1) pvCount++;
-      else ufCount++;
+    if (ratio >= 3.0) {
+      // Very strong advantage
+      itProb = 65; msProb = 25; pvProb = 8; ufProb = 2;
+    } else if (ratio >= 2.0) {
+      // Strong advantage  
+      itProb = 45; msProb = 35; pvProb = 15; ufProb = 5;
+    } else if (ratio >= 1.5) {
+      // Moderate advantage
+      itProb = 25; msProb = 40; pvProb = 25; ufProb = 10;
+    } else if (ratio >= 1.1) {
+      // Slight advantage
+      itProb = 15; msProb = 35; pvProb = 35; ufProb = 15;
+    } else if (ratio >= 0.9) {
+      // Even match
+      itProb = 10; msProb = 25; pvProb = 35; ufProb = 30;
+    } else if (ratio >= 0.7) {
+      // Slight disadvantage
+      itProb = 5; msProb = 20; pvProb = 35; ufProb = 40;
+    } else if (ratio >= 0.5) {
+      // Moderate disadvantage
+      itProb = 3; msProb = 12; pvProb = 25; ufProb = 60;
+    } else {
+      // Strong disadvantage
+      itProb = 1; msProb = 4; pvProb = 15; ufProb = 80;
     }
 
     return {
-      immenseTriumph: itCount / 10,
-      moderateSuccess: msCount / 10,
-      pyrrhicVictory: pvCount / 10,
-      utterFailure: ufCount / 10
+      immenseTriumph: itProb,
+      moderateSuccess: msProb,
+      pyrrhicVictory: pvProb,
+      utterFailure: ufProb
     };
   }
 
