@@ -108,6 +108,52 @@ function RealBattleContent() {
     }
   }, []); // Remove pusherClient dependency to prevent loops
 
+  const checkForExistingBattle = useCallback(async () => {
+    try {
+      // First check for active battles where user is participating
+      const response = await fetch('/api/multiplayer?action=active-games');
+      const data = await response.json();
+      
+      if (data.battles && data.battles.length > 0) {
+        // Find battle where current user is a participant
+        const userBattle = data.battles.find((battle: any) => 
+          battle.lobby?.players?.some((player: any) => 
+            player.name === session?.user?.name
+          )
+        );
+        
+        if (userBattle) {
+          console.log('Found existing battle, rejoining:', userBattle);
+          
+          // Get full battle state
+          const battleStateResponse = await fetch('/api/multiplayer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'get-battle-state',
+              battleId: userBattle.id
+            })
+          });
+          
+          const battleStateData = await battleStateResponse.json();
+          if (battleStateData.battle) {
+            console.log('Loaded battle state:', battleStateData.battle);
+            setBattle(battleStateData.battle);
+            setCurrentLobby(battleStateData.battle.lobby);
+            setGameState('battle');
+            
+            // Subscribe to battle-specific events
+            if (pusherClient) {
+              subscribeToLobbyEvents(battleStateData.battle.lobby.id);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check for existing battle:', error);
+    }
+  }, [session?.user?.name, pusherClient]);
+
   // Debug effect to track state changes
   useEffect(() => {
     console.log('=== STATE CHANGE DETECTED ===');
@@ -158,10 +204,11 @@ function RealBattleContent() {
       setBattles(prev => [data, ...prev]);
     });
 
-    // Check if user is already in a lobby (with delay to prevent immediate calls)
+    // Check if user is already in a lobby or battle (with delay to prevent immediate calls)
     if (session?.user) {
       setTimeout(() => {
         checkForExistingLobby();
+        checkForExistingBattle();
       }, 1000);
     }
 
