@@ -79,6 +79,9 @@ function RealBattleContent() {
     }
   });
 
+  const [hasInitialized, setHasInitialized] = useState(false);
+  const [isLoadingGames, setIsLoadingGames] = useState(false);
+  
   const checkForExistingLobby = useCallback(async () => {
     try {
       const response = await fetch('/api/multiplayer', {
@@ -103,8 +106,7 @@ function RealBattleContent() {
     } catch (error) {
       console.error('Failed to check for existing lobby:', error);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pusherClient]);
+  }, []); // Remove pusherClient dependency to prevent loops
 
   // Debug effect to track state changes
   useEffect(() => {
@@ -115,6 +117,15 @@ function RealBattleContent() {
 
   // Initialize Pusher and load initial data
   useEffect(() => {
+    // Prevent multiple initializations
+    if (hasInitialized) {
+      console.log('🔄 Already initialized, skipping...');
+      return;
+    }
+    
+    console.log('🔄 Initializing battle/real page...');
+    setHasInitialized(true);
+
     // Initialize Pusher
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
@@ -147,31 +158,35 @@ function RealBattleContent() {
       setBattles(prev => [data, ...prev]);
     });
 
-    // Check if user is already in a lobby
+    // Check if user is already in a lobby (with delay to prevent immediate calls)
     if (session?.user) {
-      checkForExistingLobby();
+      setTimeout(() => {
+        checkForExistingLobby();
+      }, 1000);
     }
 
-    // Load initial data
-    loadActiveGames();
-    loadOnlineUsers();
+    // Load initial data with delay
+    setTimeout(() => {
+      loadActiveGames();
+      loadOnlineUsers();
+    }, 2000);
 
-    // Set up periodic data refresh (less frequent since we have real-time updates)
+    // Set up periodic data refresh (much less frequent since we have real-time updates)
     const interval = setInterval(() => {
       loadActiveGames();
       loadOnlineUsers();
-    }, 30000); // Refresh every 30 seconds as fallback
+    }, 60000); // Increased from 30 seconds to 60 seconds
 
     // Set up heartbeat for online presence
     const heartbeatInterval = setInterval(() => {
       if (session?.user) {
         updateOnlineStatus();
       }
-    }, 60000); // Update presence every minute
+    }, 120000); // Increased from 60 seconds to 2 minutes
 
     // Set up periodic lobby cleanup (less frequent)
     const cleanupInterval = setInterval(() => {
-      // Trigger cleanup via API call every 2 minutes
+      // Trigger cleanup via API call every 5 minutes
       fetch('/api/lobby-cleanup', { method: 'POST' })
         .then(response => response.json())
         .then(data => {
@@ -180,7 +195,7 @@ function RealBattleContent() {
           }
         })
         .catch(error => console.error('Cleanup failed:', error));
-    }, 120000); // Cleanup every 2 minutes
+    }, 300000); // Increased from 2 minutes to 5 minutes
 
     return () => {
       clearInterval(interval);
@@ -189,7 +204,7 @@ function RealBattleContent() {
       pusher.unsubscribe('multiplayer');
       pusher.disconnect();
     };
-  }, [session, checkForExistingLobby]);
+  }, [session?.user?.name]); // REMOVED checkForExistingLobby from dependencies!
 
   // Update host name when session changes
   useEffect(() => {
@@ -210,6 +225,12 @@ function RealBattleContent() {
   }, [searchParams, session]);
 
   const loadActiveGames = async () => {
+    if (isLoadingGames) {
+      console.log('🔄 Already loading games, skipping...');
+      return;
+    }
+    
+    setIsLoadingGames(true);
     console.log('🔄 Loading active games...');
     try {
       const response = await fetch('/api/multiplayer?action=active-games');
@@ -219,16 +240,28 @@ function RealBattleContent() {
       setBattles(data.battles || []);
     } catch (error) {
       console.error('Failed to load active games:', error);
+    } finally {
+      setIsLoadingGames(false);
     }
   };
 
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  
   const loadOnlineUsers = async () => {
+    if (isLoadingUsers) {
+      console.log('🔄 Already loading users, skipping...');
+      return;
+    }
+    
+    setIsLoadingUsers(true);
     try {
       const response = await fetch('/api/online-users');
       const data = await response.json();
       setOnlineUsers(data.users || []);
     } catch (error) {
       console.error('Failed to load online users:', error);
+    } finally {
+      setIsLoadingUsers(false);
     }
   };
 
@@ -370,7 +403,8 @@ function RealBattleContent() {
         // Subscribe to lobby-specific events
         subscribeToLobbyEvents(data.lobby.id);
         
-        await loadActiveGames(); // Refresh the lobby list
+        // Don't need to refresh lobby list since real-time events handle it
+        // await loadActiveGames(); // REMOVED to prevent API spam
       } else {
         setError(data.error || 'Failed to create lobby');
       }
@@ -441,8 +475,8 @@ function RealBattleContent() {
           console.log('currentLobby after update:', currentLobby);
           console.log('Should show lobby view:', gameState === 'lobby' && !!currentLobby);
           
-          // Load active games after state has settled
-          loadActiveGames();
+          // Don't load active games here - real-time events handle updates
+          // loadActiveGames(); // REMOVED to prevent API spam
         }, 100);
         
       } else {
@@ -488,8 +522,8 @@ function RealBattleContent() {
         setCurrentLobby(null);
         setGameState('setup');
         
-        // Refresh active games list
-        await loadActiveGames();
+        // Don't refresh active games - real-time events handle this
+        // await loadActiveGames(); // REMOVED to prevent API spam
       } else {
         console.error('❌ Failed to leave lobby:', data);
         setError(data.error || 'Failed to leave lobby');
