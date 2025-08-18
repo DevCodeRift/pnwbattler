@@ -44,6 +44,10 @@ function RealBattleContent() {
   const [error, setError] = useState<string>('');
   const [pusherClient, setPusherClient] = useState<Pusher | null>(null);
   const pusherRef = useRef<Pusher | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<number>(0);
+  const [isLoadingGames, setIsLoadingGames] = useState(false);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   // Redirect unauthenticated users
   useEffect(() => {
@@ -79,9 +83,6 @@ function RealBattleContent() {
     }
   });
 
-  const [hasInitialized, setHasInitialized] = useState(false);
-  const [isLoadingGames, setIsLoadingGames] = useState(false);
-  
   const checkForExistingLobby = useCallback(async () => {
     try {
       const response = await fetch('/api/multiplayer', {
@@ -283,8 +284,17 @@ function RealBattleContent() {
       const response = await fetch('/api/multiplayer?action=active-games');
       const data = await response.json();
       console.log('📊 Active games loaded:', { lobbies: data.lobbies?.length, battles: data.battles?.length });
-      setLobbies(data.lobbies || []);
+      
+      // Filter out lobbies older than 10 minutes to prevent stale data
+      const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
+      const filteredLobbies = (data.lobbies || []).filter((lobby: any) => {
+        const lobbyAge = Date.now() - new Date(lobby.createdAt).getTime();
+        return lobbyAge < (10 * 60 * 1000); // Less than 10 minutes old
+      });
+      
+      setLobbies(filteredLobbies);
       setBattles(data.battles || []);
+      setLastRefresh(Date.now());
     } catch (error) {
       console.error('Failed to load active games:', error);
     } finally {
@@ -292,8 +302,14 @@ function RealBattleContent() {
     }
   };
 
-  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-  
+  // Throttled refresh function - only refresh if it's been more than 10 seconds
+  const throttledRefresh = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRefresh > 10000) { // 10 seconds throttle
+      loadActiveGames();
+    }
+  }, [lastRefresh]);
+
   const loadOnlineUsers = async () => {
     if (isLoadingUsers) {
       console.log('🔄 Already loading users, skipping...');
@@ -451,7 +467,7 @@ function RealBattleContent() {
         subscribeToLobbyEvents(data.lobby.id);
         
         // Don't need to refresh lobby list since real-time events handle it
-        // await loadActiveGames(); // REMOVED to prevent API spam
+        throttledRefresh(); // Throttled refresh after lobby creation
       } else {
         setError(data.error || 'Failed to create lobby');
       }
@@ -570,7 +586,7 @@ function RealBattleContent() {
         setGameState('setup');
         
         // Don't refresh active games - real-time events handle this
-        // await loadActiveGames(); // REMOVED to prevent API spam
+        throttledRefresh(); // Throttled refresh after leaving lobby
       } else {
         console.error('❌ Failed to leave lobby:', data);
         setError(data.error || 'Failed to leave lobby');
@@ -681,6 +697,30 @@ function RealBattleContent() {
           {currentLobby && <p>Current Lobby: ID={currentLobby.id}, Players={currentLobby.playerCount}</p>}
           <p>Session Status: {session ? 'Authenticated' : 'Not authenticated'} | Loading: {loading}</p>
         </div>
+
+        {/* Active Game Status */}
+        {(currentLobby || currentBattle) && (
+          <div className="bg-blue-800 rounded-lg p-4 mb-6">
+            <h3 className="text-lg font-semibold mb-2">🎮 Your Active Game</h3>
+            {currentBattle ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-200">You are currently in an active battle!</p>
+                  <p className="text-sm text-blue-300">Battle ID: {currentBattle.id}</p>
+                </div>
+                <div className="text-green-400 font-semibold">⚔️ IN BATTLE</div>
+              </div>
+            ) : currentLobby ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-200">You are in a lobby waiting for the battle to start</p>
+                  <p className="text-sm text-blue-300">Lobby: {currentLobby.hostName} ({currentLobby.playerCount} players)</p>
+                </div>
+                <div className="text-yellow-400 font-semibold">⏳ WAITING</div>
+              </div>
+            ) : null}
+          </div>
+        )}
 
         {/* Error Display */}
         {error && (
@@ -836,7 +876,7 @@ function RealBattleContent() {
                 
                 {/* Waiting Lobbies */}
                 <div className="mb-6">
-                  <h3 className="text-lg font-medium mb-3">Open Lobbies ({lobbies.length})</h3>
+                  <h3 className="text-lg font-medium mb-3">Open Lobbies ({lobbies.filter(lobby => lobby.status === 'WAITING').length})</h3>
                   
                   {/* Debug Test Button */}
                   <div className="mb-4 p-2 bg-red-800 rounded">
@@ -846,35 +886,52 @@ function RealBattleContent() {
                     >
                       Test Button Click (Debug)
                     </button>
+                    <button 
+                      onClick={() => {
+                        console.log('🔄 Manual refresh triggered');
+                        loadActiveGames();
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm ml-2"
+                    >
+                      Refresh Lobbies
+                    </button>
                   </div>
                   
-                  {lobbies.length === 0 ? (
+                  {lobbies.filter(lobby => lobby.status === 'WAITING').length === 0 ? (
                     <p className="text-gray-400">No open lobbies available</p>
                   ) : (
                     <div className="space-y-2">
-                      {lobbies.map((lobby) => (
-                        <div key={lobby.id} className="bg-gray-700 rounded p-3">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <h4 className="font-medium">{lobby.hostName}&apos;s Game</h4>
-                              <p className="text-sm text-gray-300">
-                                Players: {lobby.playerCount}/{settings.maxPlayers} | 
-                                Created: {new Date(lobby.createdAt).toLocaleTimeString()}
-                              </p>
+                      {lobbies
+                        .filter(lobby => lobby.status === 'WAITING')
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        .map((lobby) => {
+                          const lobbyAge = Date.now() - new Date(lobby.createdAt).getTime();
+                          const ageMinutes = Math.floor(lobbyAge / (1000 * 60));
+                          
+                          return (
+                            <div key={lobby.id} className="bg-gray-700 rounded p-3">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <h4 className="font-medium">{lobby.hostName}&apos;s Game</h4>
+                                  <p className="text-sm text-gray-300">
+                                    Players: {lobby.playerCount}/{settings.maxPlayers} | 
+                                    Created: {ageMinutes < 1 ? 'Just now' : `${ageMinutes}m ago`}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    console.log('🔘 JOIN BUTTON CLICKED!', { lobbyId: lobby.id, loading, disabled: loading || lobby.playerCount >= settings.maxPlayers });
+                                    joinLobby(lobby.id);
+                                  }}
+                                  disabled={loading || lobby.playerCount >= settings.maxPlayers}
+                                  className="bg-green-600 hover:bg-green-700 disabled:opacity-50 px-4 py-2 rounded text-sm"
+                                >
+                                  Join
+                                </button>
+                              </div>
                             </div>
-                            <button
-                              onClick={() => {
-                                console.log('🔘 JOIN BUTTON CLICKED!', { lobbyId: lobby.id, loading, disabled: loading || lobby.playerCount >= settings.maxPlayers });
-                                joinLobby(lobby.id);
-                              }}
-                              disabled={loading || lobby.playerCount >= settings.maxPlayers}
-                              className="bg-green-600 hover:bg-green-700 disabled:opacity-50 px-4 py-2 rounded text-sm"
-                            >
-                              Join
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                          );
+                        })}
                     </div>
                   )}
                 </div>
