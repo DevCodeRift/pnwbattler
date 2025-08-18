@@ -17,22 +17,32 @@ export async function GET(request: NextRequest) {
   try {
     console.log('GET /api/verify - Starting verification check');
     
-    // Add basic environment check
+    // Add basic environment check first
     if (!process.env.DATABASE_URL) {
       console.error('GET /api/verify - DATABASE_URL not configured');
       return NextResponse.json(
-        { error: 'Server configuration error' },
+        { error: 'Server configuration error - database not configured' },
         { status: 500 }
       );
     }
 
-    const session = await getServerSession(authOptions);
-    console.log('GET /api/verify - Session:', session ? 'exists' : 'null');
+    // Try to get session with additional error handling
+    let session;
+    try {
+      session = await getServerSession(authOptions);
+      console.log('GET /api/verify - Session retrieved successfully:', !!session);
+    } catch (authError) {
+      console.error('GET /api/verify - Auth error:', authError);
+      return NextResponse.json(
+        { error: 'Authentication system error', details: authError instanceof Error ? authError.message : 'Unknown auth error' },
+        { status: 500 }
+      );
+    }
     
     if (!session?.user) {
-      console.log('GET /api/verify - No session or user');
+      console.log('GET /api/verify - No session or user, returning not authenticated');
       return NextResponse.json(
-        { error: 'Authentication required' },
+        { verified: false, error: 'Authentication required' },
         { status: 401 }
       );
     }
@@ -43,23 +53,33 @@ export async function GET(request: NextRequest) {
     if (!discordId) {
       console.log('GET /api/verify - No Discord ID in session');
       return NextResponse.json(
-        { error: 'Discord ID not found in session' },
+        { verified: false, error: 'Discord ID not found in session' },
         { status: 400 }
       );
     }
 
-    // Check if user is verified in database with error handling
+    // Check if user is verified in database with enhanced error handling
     console.log('GET /api/verify - Checking database for user:', discordId);
     let user;
     try {
+      // Test database connection first
+      await prisma.$connect();
+      console.log('GET /api/verify - Database connected successfully');
+      
       user = await prisma.user.findUnique({
         where: { discordId },
       });
-      console.log('GET /api/verify - User found:', user ? 'yes' : 'no');
+      console.log('GET /api/verify - User query completed, found:', !!user);
     } catch (dbError) {
       console.error('GET /api/verify - Database error:', dbError);
+      // Return a more graceful error that won't crash the frontend
       return NextResponse.json(
-        { error: 'Database connection failed', details: dbError instanceof Error ? dbError.message : 'Unknown database error' },
+        { 
+          verified: false, 
+          error: 'Database connection failed', 
+          details: dbError instanceof Error ? dbError.message : 'Unknown database error',
+          canRetry: true 
+        },
         { status: 500 }
       );
     }
@@ -79,10 +99,17 @@ export async function GET(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Error checking verification status:', error);
+    console.error('GET /api/verify - Unexpected error:', error);
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    
+    // Return a response that won't crash the frontend
     return NextResponse.json(
-      { error: 'Failed to check verification status', details: error instanceof Error ? error.message : 'Unknown error' },
+      { 
+        verified: false, 
+        error: 'Server error occurred', 
+        details: error instanceof Error ? error.message : 'Unknown error',
+        canRetry: true 
+      },
       { status: 500 }
     );
   }
