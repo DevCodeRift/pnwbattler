@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../lib/auth';
 import { apolloClient, GET_NATION_BY_ID } from '../../../lib/apollo-client';
+import { prisma } from '../../../lib/prisma';
 
 // Manual verification endpoint for admin use (production-safe)
 export async function POST(request: NextRequest) {
@@ -50,6 +51,40 @@ export async function POST(request: NextRequest) {
 
       const nation = data.nations.data[0];
 
+      // Save or update user in database
+      console.log('MANUAL-VERIFY: Saving verification to database for Discord ID:', discordId);
+      try {
+        await prisma.user.upsert({
+          where: { discordId },
+          update: {
+            isVerified: true,
+            pwNationId: nationId,
+            pwNationName: nation.nation_name,
+            pwNationData: nation,
+            verifiedAt: new Date(),
+            discordUsername: (session.user as any).username || session.user.name,
+            discordAvatar: (session.user as any).avatar,
+          },
+          create: {
+            discordId,
+            discordUsername: (session.user as any).username || session.user.name || 'Unknown',
+            discordAvatar: (session.user as any).avatar,
+            isVerified: true,
+            pwNationId: nationId,
+            pwNationName: nation.nation_name,
+            pwNationData: nation,
+            verifiedAt: new Date(),
+          },
+        });
+        console.log('MANUAL-VERIFY: User verified and saved successfully');
+      } catch (dbError) {
+        console.error('MANUAL-VERIFY: Database save error:', dbError);
+        return NextResponse.json(
+          { error: 'Failed to save verification to database', details: dbError instanceof Error ? dbError.message : 'Unknown database error' },
+          { status: 500 }
+        );
+      }
+
       // Manual verification successful
       return NextResponse.json({
         message: `Account verified manually (admin override${process.env.NODE_ENV === 'development' ? ' - development mode' : ''})`,
@@ -72,5 +107,29 @@ export async function POST(request: NextRequest) {
       { error: 'Failed to process manual verification' },
       { status: 500 }
     );
+  }
+}
+
+// GET endpoint to check if user can use manual verification
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user) {
+      return NextResponse.json({ canUseManual: false, reason: 'Not authenticated' });
+    }
+
+    const discordId = (session.user as any).discordId;
+    const isAdmin = discordId === '989576730165518437'; // Your Discord ID
+    
+    return NextResponse.json({
+      canUseManual: isAdmin,
+      isAdmin,
+      discordId: discordId,
+      message: isAdmin ? 'You can use manual verification' : 'Manual verification restricted to admin',
+    });
+
+  } catch (error) {
+    return NextResponse.json({ canUseManual: false, reason: 'Error checking permissions' });
   }
 }
